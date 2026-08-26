@@ -71,3 +71,19 @@ def search_deposit_products(
 
     products.sort(key=lambda p: p.max_rate, reverse=True)
     return products[:top_n]
+
+
+def format_deposit_products(products: list[DepositProduct]) -> str:
+    """상품 목록을 LLM이 인용하기 좋은 한국어 텍스트로 만든다."""
+    if not products:
+        return "조회된 정기예금 상품이 없습니다."
+
+    lines = [f"[공시월 {products[0].disclosure_month} 기준] 정기예금 최고우대금리 상위 상품:"]
+    for rank, p in enumerate(products, start=1):
+        lines.append(
+            f"{rank}. {p.bank} {p.name} — 기본 {p.base_rate:.2f}% / 최고 {p.max_rate:.2f}%"
+            f" ({p.term_months}개월, 가입경로: {p.join_way})"
+        )
+        if p.special_condition:
+            lines.append(f"   우대조건: {p.special_condition}")
+    return "\n".join(lines)

@@ -3,7 +3,7 @@ from typing import Any
 import httpx
 import respx
 
-from app.tools.deposit import search_deposit_products
+from app.tools.deposit import DepositProduct, format_deposit_products, search_deposit_products
 from app.tools.finlife import BASE_URL
 
 URL = f"{BASE_URL}/depositProductsSearch.json"
@@ -140,6 +140,30 @@ def test_우대금리가_없는_옵션은_제외하고_기본금리가_없으면
     assert len(products) == 1
     assert products[0].bank == "가은행"
     assert products[0].base_rate == 0.0
+
+
+def test_상품_목록을_읽기_좋은_텍스트로_포맷한다() -> None:
+    products = [
+        DepositProduct(
+            bank="나은행",
+            name="나예금",
+            term_months=12,
+            base_rate=2.5,
+            max_rate=3.5,
+            join_way="인터넷,스마트폰",
+            special_condition="첫 거래 우대",
+            disclosure_month="202608",
+        )
+    ]
+    text = format_deposit_products(products)
+    assert "나은행" in text
+    assert "3.50" in text
+    assert "202608" in text
+    assert "첫 거래 우대" in text
+
+
+def test_빈_목록은_없다는_안내를_반환한다() -> None:
+    assert "없" in format_deposit_products([])
 
 
 @respx.mock
