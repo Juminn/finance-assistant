@@ -4,12 +4,14 @@
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
 # pyright: reportUnknownArgumentType=false
 
+from functools import lru_cache
 from typing import Any, Literal
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, SecretStr
@@ -89,3 +91,9 @@ def build_graph(
     builder.add_edge("loan", END)
     builder.add_edge("general", END)
     return builder.compile(checkpointer=checkpointer)
+
+
+@lru_cache
+def get_agent() -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    """프로세스 전역 에이전트 — 멀티턴 상태는 메모리 체크포인터(thread_id)로 유지."""
+    return build_graph(checkpointer=MemorySaver())

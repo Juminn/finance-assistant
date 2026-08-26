@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>금융 통합 비서</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --ink: #1c2733; --sub: #6b7a8c;
+    --accent: #2563eb; --accent-ink: #ffffff; --line: #e3e8ef;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; flex-direction: column; height: 100dvh;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 17px; }
+  header .auth { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  header input {
+    width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+  }
+  button {
+    border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font-size: 13px;
+  }
+  button.ghost { background: transparent; color: var(--sub); }
+  #messages {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; gap: 10px; max-width: 760px; width: 100%;
+    margin: 0 auto;
+  }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px;
+         line-height: 1.55; white-space: pre-wrap; }
+  .user { align-self: flex-end; background: var(--accent); color: #fff;
+          border-bottom-right-radius: 4px; }
+  .assistant { align-self: flex-start; background: var(--card);
+               border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .hint { align-self: center; color: var(--sub); font-size: 13px; text-align: center; }
+  footer {
+    padding: 14px 20px 20px; background: var(--bg);
+  }
+  form { display: flex; gap: 8px; max-width: 760px; margin: 0 auto; }
+  form input {
+    flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+    font-size: 14px; background: var(--card);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>💬 금융 통합 비서</h1>
+    <div class="auth" id="auth"></div>
+  </header>
+
+  <div id="messages">
+    <div class="hint">예금·적금 상품 비교를 도와드려요.<br/>예: "1년 정기예금 금리 높은 순으로 알려줘"</div>
+  </div>
+
+  <footer>
+    <form id="chat-form">
+      <input id="chat-input" placeholder="메시지를 입력하세요" autocomplete="off" />
+      <button type="submit">전송</button>
+    </form>
+  </footer>
+
+<script>
+  const messagesEl = document.getElementById("messages");
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("chat-input");
+  const authEl = document.getElementById("auth");
+
+  let sessionId = sessionStorage.getItem("session_id") || null;
+
+  function token() { try { return localStorage.getItem("token"); } catch { return null; } }
+  function username() { try { return localStorage.getItem("username"); } catch { return null; } }
+
+  function renderAuth() {
+    if (token()) {
+      authEl.innerHTML = `<span>${username()}님</span><button class="ghost" id="logout">로그아웃</button>`;
+      document.getElementById("logout").onclick = () => {
+        try { localStorage.removeItem("token"); localStorage.removeItem("username"); } catch {}
+        renderAuth();
+      };
+    } else {
+      authEl.innerHTML = `
+        <input id="login-id" placeholder="아이디 (demo)" />
+        <input id="login-pw" type="password" placeholder="비밀번호" />
+        <button id="login-btn">로그인</button>`;
+      document.getElementById("login-btn").onclick = login;
+    }
+  }
+
+  async function login() {
+    const usernameInput = document.getElementById("login-id").value || "demo";
+    const passwordInput = document.getElementById("login-pw").value;
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: usernameInput, password: passwordInput }),
+    });
+    if (!res.ok) { addMessage("hint", "로그인에 실패했어요. 아이디/비밀번호를 확인해주세요."); return; }
+    const data = await res.json();
+    try {
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("username", data.username);
+    } catch {}
+    renderAuth();
+  }
+
+  function addMessage(role, text) {
+    const div = document.createElement("div");
+    div.className = role === "hint" ? "hint" : `msg ${role}`;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    addMessage("user", text);
+    const thinking = addMessage("assistant", "생각 중…");
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (token()) headers["Authorization"] = `Bearer ${token()}`;
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ message: text, session_id: sessionId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      sessionId = data.session_id;
+      try { sessionStorage.setItem("session_id", sessionId); } catch {}
+      thinking.textContent = data.reply;
+    } catch (err) {
+      thinking.textContent = `오류가 발생했어요: ${err.message}`;
+    }
+  });
+
+  renderAuth();
+  input.focus();
+</script>
+</body>
+</html>

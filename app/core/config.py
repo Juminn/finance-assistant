@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     finlife_api_key: str = ""
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
+    database_url: str = "sqlite:///./data/app.db"
+    demo_username: str = "demo"
+    demo_password: str = "demo1234!"
 
 
 @lru_cache
