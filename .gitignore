@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 시크릿 — 절대 커밋 금지
+.env
+
+# 로컬 데이터
+data/
+*.sqlite3
+*.db
+
+# 로컬 도구 설정
+.claude/settings.local.json
