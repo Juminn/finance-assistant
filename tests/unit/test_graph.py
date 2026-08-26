@@ -1,12 +1,11 @@
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 
 from app.agents.graph import (
     AgentState,
     IntentDecision,
     build_graph,
-    loan_stub,
     route_by_intent,
     supervisor,
 )
@@ -31,13 +30,6 @@ def test_그래프에_supervisor와_워커_노드가_모두_있다() -> None:
     graph = build_graph()
     nodes = set(graph.get_graph().nodes)
     assert {"supervisor", "deposit", "loan", "general"} <= nodes
-
-
-def test_loan_스텁은_준비중_안내를_반환한다() -> None:
-    update = loan_stub(make_state("loan"))
-    messages = update["messages"]
-    assert isinstance(messages[0], AIMessage)
-    assert "준비 중" in str(messages[0].content)
 
 
 class FakeStructuredModel:

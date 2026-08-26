@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.agents.graph import get_agent
 from app.api.deps import DbDep, OptionalUserDep
+from app.core.auth_context import authenticated_request
 from app.core.pii import mask_pii
 from app.db import repo
 
@@ -40,10 +41,11 @@ class HistoryResponse(BaseModel):
 def chat(body: ChatRequest, db: DbDep, user: OptionalUserDep) -> ChatResponse:
     session_id = body.session_id or uuid4().hex
     try:
-        result = get_agent().invoke(
-            {"messages": [HumanMessage(body.message)]},
-            config={"configurable": {"thread_id": session_id}},
-        )
+        with authenticated_request(user is not None):
+            result = get_agent().invoke(
+                {"messages": [HumanMessage(body.message)]},
+                config={"configurable": {"thread_id": session_id}},
+            )
     except Exception:
         logging.exception("에이전트 호출 실패 (session_id=%s)", session_id)
         raise HTTPException(

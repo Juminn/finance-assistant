@@ -3,6 +3,17 @@ from pydantic_settings import SettingsConfigDict
 
 from app.core.config import Settings, get_settings
 
+_ENV_KEYS = (
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "FINLIFE_API_KEY",
+    "LANGSMITH_TRACING",
+    "LANGSMITH_API_KEY",
+    "DATABASE_URL",
+    "DEMO_USERNAME",
+    "DEMO_PASSWORD",
+)
+
 
 class SettingsWithoutDotenv(Settings):
     """개발자 로컬 .env가 테스트 결과에 끼어들지 않도록 env_file을 끈다."""
@@ -10,7 +21,14 @@ class SettingsWithoutDotenv(Settings):
     model_config = SettingsConfigDict(env_file=None)
 
 
-def test_기본값은_빈_키와_기본_모델을_가진다() -> None:
+@pytest.fixture
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """다른 테스트(load_dotenv 등)가 올려둔 환경변수까지 걷어낸다."""
+    for key in _ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_기본값은_빈_키와_기본_모델을_가진다(clean_env: None) -> None:
     settings = SettingsWithoutDotenv()
     assert settings.openai_api_key == ""
     assert settings.openai_model == "gpt-5-mini"
@@ -18,7 +36,7 @@ def test_기본값은_빈_키와_기본_모델을_가진다() -> None:
     assert settings.langsmith_tracing is False
 
 
-def test_환경변수가_기본값을_덮어쓴다(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_환경변수가_기본값을_덮어쓴다(clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_MODEL", "gpt-custom")
     settings = SettingsWithoutDotenv()
     assert settings.openai_model == "gpt-custom"

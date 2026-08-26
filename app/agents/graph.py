@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
@@ -19,10 +19,16 @@ from pydantic import BaseModel, SecretStr
 from app.agents.prompts import (
     DEPOSIT_AGENT_SYSTEM,
     GENERAL_AGENT_SYSTEM,
-    LOAN_COMING_SOON,
+    LOAN_AGENT_SYSTEM,
     SUPERVISOR_SYSTEM,
 )
-from app.agents.tools import compare_deposit_products
+from app.agents.tools import (
+    compare_credit_loans,
+    compare_deposit_products,
+    compare_mortgage_loans,
+    compare_rent_loans,
+    compare_saving_products,
+)
 from app.core.config import get_settings
 
 Intent = Literal["deposit", "loan", "general"]
@@ -62,10 +68,6 @@ def route_by_intent(state: AgentState) -> str:
     return "general"
 
 
-def loan_stub(state: AgentState) -> dict[str, Any]:
-    return {"messages": [AIMessage(content=LOAN_COMING_SOON)]}
-
-
 def general(state: AgentState) -> dict[str, Any]:
     reply = _chat_model().invoke([SystemMessage(GENERAL_AGENT_SYSTEM), *state["messages"]])
     return {"messages": [reply]}
@@ -76,14 +78,19 @@ def build_graph(
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     deposit_agent = create_agent(
         _chat_model(),
-        tools=[compare_deposit_products],
+        tools=[compare_deposit_products, compare_saving_products],
         system_prompt=DEPOSIT_AGENT_SYSTEM,
+    )
+    loan_agent = create_agent(
+        _chat_model(),
+        tools=[compare_mortgage_loans, compare_rent_loans, compare_credit_loans],
+        system_prompt=LOAN_AGENT_SYSTEM,
     )
 
     builder = StateGraph(AgentState)
     builder.add_node("supervisor", supervisor)
     builder.add_node("deposit", deposit_agent)
-    builder.add_node("loan", loan_stub)
+    builder.add_node("loan", loan_agent)
     builder.add_node("general", general)
     builder.add_edge(START, "supervisor")
     builder.add_conditional_edges("supervisor", route_by_intent, ["deposit", "loan", "general"])

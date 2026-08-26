@@ -7,18 +7,21 @@ from langchain_core.messages import AIMessage
 
 import app.api.chat as chat_module
 from app.api.main import create_app
+from app.core.auth_context import is_authenticated
 from app.db.base import make_engine
 
 
 class FakeAgent:
-    """항상 정해진 답을 돌려주는 가짜 그래프."""
+    """항상 정해진 답을 돌려주는 가짜 그래프. 호출 시점의 인증 컨텍스트도 기록한다."""
 
     def __init__(self, reply: str) -> None:
         self.reply = reply
         self.calls: list[dict[str, Any]] = []
 
     def invoke(self, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-        self.calls.append({"payload": payload, "config": config})
+        self.calls.append(
+            {"payload": payload, "config": config, "authenticated": is_authenticated()}
+        )
         return {"messages": [AIMessage(content=self.reply)]}
 
 
@@ -66,6 +69,27 @@ def test_답변의_개인정보는_마스킹되어_나간다(client: TestClient,
     fake_agent.reply = "고객님 번호 900101-1234567 확인했습니다"
     response = client.post("/api/chat", json={"message": "내 정보 알려줘"})
     assert "900101-1234567" not in response.json()["reply"]
+
+
+def test_비로그인_요청은_비인증_컨텍스트로_실행된다(
+    client: TestClient, fake_agent: FakeAgent
+) -> None:
+    client.post("/api/chat", json={"message": "신용대출 금리"})
+    assert fake_agent.calls[-1]["authenticated"] is False
+
+
+def test_로그인한_요청은_인증_컨텍스트로_실행된다(
+    client: TestClient, fake_agent: FakeAgent
+) -> None:
+    token = client.post(
+        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
+    ).json()["token"]
+    client.post(
+        "/api/chat",
+        json={"message": "신용대출 금리"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert fake_agent.calls[-1]["authenticated"] is True
 
 
 def test_에이전트가_실패하면_502와_안내_메시지를_준다(
