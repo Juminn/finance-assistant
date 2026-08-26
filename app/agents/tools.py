@@ -98,8 +98,8 @@ def compare_credit_loans(top_n: int = 5) -> str:
     """
     if not is_authenticated():
         return (
-            "개인신용대출 정보는 로그인한 사용자에게만 제공됩니다. "
-            "화면 우측 상단에서 로그인한 뒤 다시 요청해 달라고 안내하세요."
+            "[권한 안내] 개인신용대출 정보는 로그인 후 제공됩니다. "
+            "사용자에게 화면 우측 상단에서 로그인한 뒤 다시 물어봐 달라고 짧게 안내하라."
         )
     return _with_client(
         lambda client, key: format_credit_loans(
