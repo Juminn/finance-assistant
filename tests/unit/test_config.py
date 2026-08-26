@@ -44,3 +44,19 @@ def test_환경변수가_기본값을_덮어쓴다(clean_env: None, monkeypatch:
 
 def test_get_settings는_같은_인스턴스를_반환한다() -> None:
     assert get_settings() is get_settings()
+
+
+def test_DATABASE_URL이_빈_값이면_기본_SQLite로_폴백한다(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "")
+    settings = SettingsWithoutDotenv()
+    assert settings.database_url == "sqlite:///./data/app.db"
+
+
+def test_DATABASE_URL_공백만_있어도_기본값으로_폴백한다(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "   ")
+    settings = SettingsWithoutDotenv()
+    assert settings.database_url == "sqlite:///./data/app.db"

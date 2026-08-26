@@ -3,11 +3,20 @@
 import httpx
 from pydantic import BaseModel
 
-from app.tools.finlife import BANK, fetch_all
-
-_MORTGAGE_ENDPOINT = "mortgageLoanProductsSearch.json"
-_RENT_ENDPOINT = "rentHouseLoanProductsSearch.json"
-_CREDIT_ENDPOINT = "creditLoanProductsSearch.json"
+from app.tools.finlife import (
+    BANK,
+    fetch_all,
+    to_float,
+)
+from app.tools.finlife import (
+    CREDIT_ENDPOINT as _CREDIT_ENDPOINT,
+)
+from app.tools.finlife import (
+    MORTGAGE_ENDPOINT as _MORTGAGE_ENDPOINT,
+)
+from app.tools.finlife import (
+    RENT_ENDPOINT as _RENT_ENDPOINT,
+)
 
 
 class SecuredLoan(BaseModel):
@@ -44,20 +53,22 @@ def _search_secured(
 
     best: dict[tuple[str, str], SecuredLoan] = {}
     for option in options:
-        if option.get("lend_rate_min") is None:
+        rate_min = to_float(option.get("lend_rate_min"))
+        if rate_min is None:
             continue
         key = (option["fin_co_no"], option["fin_prdt_cd"])
         base = bases.get(key)
         if base is None:
             continue
+        rate_max = to_float(option.get("lend_rate_max"))
         candidate = SecuredLoan(
             bank=base["kor_co_nm"],
             name=base["fin_prdt_nm"],
             mortgage_type=option.get("mrtg_type_nm") or "",
             repay_type=option.get("rpay_type_nm") or "",
             rate_type=option.get("lend_rate_type_nm") or "",
-            rate_min=float(option["lend_rate_min"]),
-            rate_max=float(option.get("lend_rate_max") or option["lend_rate_min"]),
+            rate_min=rate_min,
+            rate_max=rate_min if rate_max is None else rate_max,
             disclosure_month=base.get("dcls_month") or "",
         )
         if key not in best or candidate.rate_min < best[key].rate_min:

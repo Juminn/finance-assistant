@@ -231,3 +231,125 @@ def test_상품이_없으면_빈_목록을_반환한다() -> None:
     mock_all()
     with httpx.Client() as client:
         assert collect_product_docs(client, api_key="key") == []
+
+
+@respx.mock
+def test_빈_문자열이나_비숫자_금리는_건너뛰고_크래시하지_않는다() -> None:
+    mock_all(
+        deposit=page(
+            base_rows=[
+                {
+                    "dcls_month": "202608",
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "kor_co_nm": "가은행",
+                    "fin_prdt_nm": "가예금",
+                }
+            ],
+            option_rows=[
+                {
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "save_trm": "12",
+                    "intr_rate": "",
+                    "intr_rate2": 3.5,
+                },
+                {
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "save_trm": "6개월",
+                    "intr_rate": 2.0,
+                    "intr_rate2": 2.5,
+                },
+            ],
+        )
+    )
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+    assert len(docs) == 1
+    assert "3.50" in docs[0].text  # 유효한 옵션은 살아남는다
+    assert "6개월" not in docs[0].text  # 비숫자 기간 옵션은 건너뛴다
+
+
+@respx.mock
+def test_결측_필드는_None_문자열이_아니라_빈_값으로_처리된다() -> None:
+    mock_all(
+        deposit=page(
+            base_rows=[{"fin_co_no": "C", "fin_prdt_cd": "P", "fin_prdt_nm": "가예금"}],
+            option_rows=[],
+        )
+    )
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+    assert "None" not in docs[0].text
+    assert docs[0].bank == ""
+    assert docs[0].disclosure_month == ""
+
+
+@respx.mock
+def test_대출_상한금리_0은_하한으로_치환되지_않는다() -> None:
+    mock_all(
+        mortgage=page(
+            base_rows=[
+                {
+                    "dcls_month": "202608",
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "kor_co_nm": "가은행",
+                    "fin_prdt_nm": "가주담대",
+                }
+            ],
+            option_rows=[
+                {
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "lend_rate_type_nm": "변동금리",
+                    "lend_rate_min": 3.5,
+                    "lend_rate_max": 0.0,
+                }
+            ],
+        )
+    )
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+    assert "3.50%~0.00%" in docs[0].text
+
+
+@respx.mock
+def test_신용대출은_대출금리_유형A_옵션만_문서에_담는다() -> None:
+    mock_all(
+        credit=page(
+            base_rows=[
+                {
+                    "dcls_month": "202608",
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "kor_co_nm": "가은행",
+                    "fin_prdt_nm": "가신용대출",
+                    "crdt_prdt_type_nm": "일반신용대출",
+                }
+            ],
+            option_rows=[
+                {
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "crdt_lend_rate_type": "A",
+                    "crdt_lend_rate_type_nm": "대출금리",
+                    "crdt_grad_avg": 5.5,
+                    "crdt_grad_1": 4.2,
+                },
+                {
+                    "fin_co_no": "C",
+                    "fin_prdt_cd": "P",
+                    "crdt_lend_rate_type": "B",  # 기준금리 → 비교 도구와 동일하게 제외
+                    "crdt_lend_rate_type_nm": "기준금리",
+                    "crdt_grad_avg": 3.0,
+                    "crdt_grad_1": 2.8,
+                },
+            ],
+        )
+    )
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+    assert "5.50" in docs[0].text
+    assert "3.00" not in docs[0].text

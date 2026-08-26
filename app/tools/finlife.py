@@ -10,7 +10,30 @@ BASE_URL = "https://finlife.fss.or.kr/finlifeapi"
 BANK = "020000"  # 은행
 SAVING_BANK = "030300"  # 저축은행
 
+# 상품 엔드포인트 — 도구·카탈로그가 공유하는 단일 정의
+DEPOSIT_ENDPOINT = "depositProductsSearch.json"
+SAVING_ENDPOINT = "savingProductsSearch.json"
+MORTGAGE_ENDPOINT = "mortgageLoanProductsSearch.json"
+RENT_ENDPOINT = "rentHouseLoanProductsSearch.json"
+CREDIT_ENDPOINT = "creditLoanProductsSearch.json"
+
 _OK = "000"
+
+
+def to_float(value: object) -> float | None:
+    """공시 응답의 금리 값을 안전하게 float으로 바꾼다. 빈 값·비숫자는 None."""
+    if value is None:
+        return None
+    try:
+        return float(str(value).strip())
+    except ValueError:
+        return None
+
+
+def to_int(value: object) -> int | None:
+    """공시 응답의 기간 값을 안전하게 int로 바꾼다. 빈 값·비숫자는 None."""
+    number = to_float(value)
+    return None if number is None else int(number)
 
 
 class FinlifeError(Exception):

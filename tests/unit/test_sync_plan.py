@@ -2,14 +2,14 @@ from app.batch.sync import plan_sync
 from app.tools.catalog import ProductDoc
 
 
-def doc(key: str, text: str) -> ProductDoc:
+def doc(key: str, text: str, month: str = "202608") -> ProductDoc:
     return ProductDoc(
         product_key=key,
         category="정기예금",
         bank="가은행",
         name="가예금",
         text=text,
-        disclosure_month="202608",
+        disclosure_month=month,
     )
 
 
@@ -48,3 +48,31 @@ def test_사라진_상품은_삭제_대상이다() -> None:
 
     assert plan.to_delete == ["deposit:GONE:9"]
     assert plan.unchanged == 1
+
+
+def test_공시월만_바뀌어도_다시_색인한다() -> None:
+    old = doc("deposit:A:1", "같은 내용", month="202607")
+    new = doc("deposit:A:1", "같은 내용", month="202608")
+    assert old.content_hash != new.content_hash
+    plan = plan_sync([new], existing={old.product_key: old.content_hash})
+    assert [d.product_key for d in plan.to_index] == ["deposit:A:1"]
+
+
+def test_수집이_통째로_비면_아무것도_삭제하지_않는다() -> None:
+    plan = plan_sync([], existing={"deposit:A:1": "h1", "saving:B:2": "h2"})
+    assert plan.to_delete == []
+    assert plan.to_index == []
+
+
+def test_수집되지_않은_카테고리의_키는_삭제하지_않는다() -> None:
+    # deposit만 수집됨(saving 엔드포인트 일시 장애 가정) → saving 키는 보존
+    collected = doc("deposit:A:1", "내용 A")
+    plan = plan_sync(
+        [collected],
+        existing={
+            collected.product_key: collected.content_hash,
+            "deposit:GONE:9": "h",  # 같은 카테고리에서 사라짐 → 삭제
+            "saving:B:2": "h",  # 수집 안 된 카테고리 → 보존
+        },
+    )
+    assert plan.to_delete == ["deposit:GONE:9"]

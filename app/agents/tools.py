@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from functools import lru_cache
 
 import httpx
 from langchain_core.tools import tool
@@ -10,10 +11,10 @@ from openai import OpenAI
 from app.core.auth_context import is_authenticated
 from app.core.config import get_settings
 from app.core.embeddings import embed_texts
-from app.db.base import is_postgres
-from app.db.session import get_session_factory
-from app.db.vector_models import ProductEmbedding
-from app.db.vector_repo import search_similar
+from app.db.session import get_session_factory, vector_search_enabled
+from app.db.vector_repo import index_ready, search_similar
+from app.tools.catalog import CATEGORIES, CREDIT_CATEGORY
+from app.tools.condition import format_matches
 from app.tools.deposit import format_deposit_products, search_deposit_products
 from app.tools.finlife import FinlifeError
 from app.tools.loan import (
@@ -115,27 +116,17 @@ def compare_credit_loans(top_n: int = 5) -> str:
     )
 
 
-_CATEGORIES = ("정기예금", "적금", "주택담보대출", "전세자금대출", "개인신용대출")
-_DETAIL_LIMIT = 400
 _TOP_K = 5
+_INDEX_NOT_READY = "조건 검색 색인이 아직 준비되지 않았습니다. 금리 비교 도구를 대신 사용하세요."
+_CREDIT_LOGIN_NOTICE = (
+    "[권한 안내] 개인신용대출 정보는 로그인 후 제공됩니다. "
+    "사용자에게 화면 우측 상단에서 로그인한 뒤 다시 물어봐 달라고 짧게 안내하라."
+)
 
 
-def _format_matches(matches: list[tuple[ProductEmbedding, float]]) -> str:
-    if not matches:
-        return "조건에 맞는 상품을 찾지 못했습니다."
-
-    lines = ["조건과 가장 가까운 상품:"]
-    for rank, (row, distance) in enumerate(matches, start=1):
-        lines.append(
-            f"{rank}. [{row.category}] {row.bank} {row.name}"
-            f" (유사도 {1 - distance:.2f}, 공시월 {row.disclosure_month})"
-        )
-        detail = " / ".join(row.text.splitlines()[1:])
-        if len(detail) > _DETAIL_LIMIT:
-            detail = detail[:_DETAIL_LIMIT] + "…"
-        if detail:
-            lines.append(f"   {detail}")
-    return "\n".join(lines)
+@lru_cache
+def _openai_client() -> OpenAI:
+    return OpenAI(api_key=get_settings().openai_api_key, timeout=10, max_retries=1)
 
 
 @tool
@@ -150,20 +141,40 @@ def search_products_by_condition(query: str, category: str = "") -> str:
         category: 좁히고 싶을 때만 지정. 정기예금/적금/주택담보대출/전세자금대출/개인신용대출.
     """
     settings = get_settings()
-    if not is_postgres(settings.database_url):
-        return "조건 검색 색인이 아직 준비되지 않았습니다. 금리 비교 도구를 대신 사용하세요."
+    if not vector_search_enabled():
+        return _INDEX_NOT_READY
     if not settings.openai_api_key:
         return "조건 검색에 필요한 OpenAI 키가 설정되지 않았습니다."
 
-    if category not in _CATEGORIES:
+    requested_category = category
+    if category not in CATEGORIES:
         category = ""
 
-    try:
-        vector = embed_texts(OpenAI(api_key=settings.openai_api_key), [query])[0]
-        with get_session_factory()() as db:
-            matches = search_similar(db, vector, top_k=_TOP_K, category=category or None)
-    except Exception as exc:
-        logging.exception("조건 검색 실패 (query=%s)", query)
-        return f"조건 검색 중 오류가 발생했습니다: {exc}"
+    # 개인신용대출 정보는 비교 도구와 동일하게 로그인 사용자에게만 제공한다
+    exclude_category = None
+    if not is_authenticated():
+        if category == CREDIT_CATEGORY:
+            return _CREDIT_LOGIN_NOTICE
+        exclude_category = CREDIT_CATEGORY
 
-    return _format_matches(matches)
+    try:
+        with get_session_factory()() as db:
+            if not index_ready(db):
+                return _INDEX_NOT_READY
+            vector = embed_texts(_openai_client(), [query])[0]
+            matches = search_similar(
+                db,
+                vector,
+                top_k=_TOP_K,
+                category=category or None,
+                exclude_category=exclude_category,
+            )
+    except Exception:
+        # 예외 원문(호스트명·계정 등)이 사용자 응답에 실리지 않게 로그로만 남긴다
+        logging.exception("조건 검색 실패 (query=%s)", query)
+        return "조건 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+
+    note = ""
+    if requested_category and requested_category not in CATEGORIES:
+        note = f"[참고] '{requested_category}' 카테고리를 인식하지 못해 전체에서 검색했습니다.\n"
+    return note + format_matches(matches)

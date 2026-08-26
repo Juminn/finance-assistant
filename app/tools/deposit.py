@@ -4,8 +4,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.tools.finlife import BANK, fetch_all
-
-_ENDPOINT = "depositProductsSearch.json"
+from app.tools.finlife import DEPOSIT_ENDPOINT as _ENDPOINT
 
 
 class DepositProduct(BaseModel):

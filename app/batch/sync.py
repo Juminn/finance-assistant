@@ -1,4 +1,4 @@
-"""상품 카탈로그 동기화 — 수집 → 변경분만 임베딩 → 벡터 저장소 반영."""
+"""상품 카탈로그 동기화 계획 — 수집 결과와 기존 색인을 비교해 작업을 정한다."""
 
 from dataclasses import dataclass, field
 
@@ -14,20 +14,29 @@ class SyncPlan:
     unchanged: int = 0
 
 
+def _slug(product_key: str) -> str:
+    return product_key.split(":", 1)[0]
+
+
 def plan_sync(docs: list[ProductDoc], existing: dict[str, str]) -> SyncPlan:
     """수집한 문서와 저장소의 (product_key → content_hash)를 비교해 작업을 정한다.
 
-    본문이 그대로인 상품은 건너뛰어 임베딩 호출 비용을 아낀다.
+    - 본문이 그대로인 상품은 건너뛰어 임베딩 호출 비용을 아낀다.
+    - 삭제는 **이번에 실제로 수집된 카테고리** 안에서 사라진 키만 대상으로 한다.
+      일시 장애로 특정 카테고리가 0건으로 오거나 일부만 수집된 경우에
+      기존 색인이 통째로 삭제되는 사고를 막기 위한 안전장치다.
     """
     plan = SyncPlan()
     seen: set[str] = set()
+    collected_slugs: set[str] = set()
 
     for doc in docs:
         seen.add(doc.product_key)
+        collected_slugs.add(_slug(doc.product_key))
         if existing.get(doc.product_key) == doc.content_hash:
             plan.unchanged += 1
         else:
             plan.to_index.append(doc)
 
-    plan.to_delete = [key for key in existing if key not in seen]
+    plan.to_delete = [key for key in existing if key not in seen and _slug(key) in collected_slugs]
     return plan

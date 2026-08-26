@@ -1,8 +1,11 @@
+import re
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
+
+_POSTGRES_SCHEME = re.compile(r"^postgres(?:ql)?(?:\+[a-z0-9]+)?://")
 
 
 class Base(DeclarativeBase):
@@ -10,10 +13,9 @@ class Base(DeclarativeBase):
 
 
 def normalize_db_url(url: str) -> str:
-    """Neon 등이 주는 postgresql:// 주소를 psycopg 드라이버용으로 바꾼다."""
-    for scheme in ("postgresql://", "postgres://"):
-        if url.startswith(scheme):
-            return "postgresql+psycopg://" + url.removeprefix(scheme)
+    """postgresql:// 계열 주소를 드라이버 표기와 무관하게 psycopg용으로 통일한다."""
+    if _POSTGRES_SCHEME.match(url):
+        return _POSTGRES_SCHEME.sub("postgresql+psycopg://", url)
     return url
 
 

@@ -6,14 +6,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine
-from sqlalchemy.orm import sessionmaker
 
 from app.api import auth, chat
 from app.core.config import get_settings
 from app.db import repo
 from app.db.base import Base
-from app.db.session import get_engine
-from app.db.vector_repo import ensure_vector_schema
+from app.db.session import get_engine, get_session_factory, set_engine
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 
@@ -25,11 +23,13 @@ def create_app(engine: Engine | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        db_engine = engine or get_engine()
+        # 주입된 엔진을 전역 소유 지점에 등록해 API·에이전트 도구·배치가
+        # 전부 같은 DB를 보게 한다 (벡터 스키마는 색인 배치가 소유)
+        if engine is not None:
+            set_engine(engine)
+        db_engine = get_engine()
         Base.metadata.create_all(db_engine)
-        if db_engine.dialect.name == "postgresql":
-            ensure_vector_schema(db_engine)
-        app.state.session_factory = sessionmaker(bind=db_engine)
+        app.state.session_factory = get_session_factory()
         with app.state.session_factory() as db:
             repo.ensure_user(db, settings.demo_username, settings.demo_password)
             db.commit()

@@ -4,8 +4,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.tools.finlife import BANK, fetch_all
-
-_ENDPOINT = "savingProductsSearch.json"
+from app.tools.finlife import SAVING_ENDPOINT as _ENDPOINT
 
 
 class SavingProduct(BaseModel):

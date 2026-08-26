@@ -40,11 +40,14 @@ class HistoryResponse(BaseModel):
 @router.post("/chat")
 def chat(body: ChatRequest, db: DbDep, user: OptionalUserDep) -> ChatResponse:
     session_id = body.session_id or uuid4().hex
+    # 인증 여부로 스레드를 분리해, 인증 상태에서 얻은 답변(신용대출 등)이
+    # 같은 session_id의 비인증 요청 컨텍스트로 재주입되지 않게 한다
+    thread_id = f"{user.id if user else 'anon'}:{session_id}"
     try:
         with authenticated_request(user is not None):
             result = get_agent().invoke(
                 {"messages": [HumanMessage(body.message)]},
-                config={"configurable": {"thread_id": session_id}},
+                config={"configurable": {"thread_id": thread_id}},
             )
     except Exception:
         logging.exception("에이전트 호출 실패 (session_id=%s)", session_id)
@@ -60,9 +63,13 @@ def chat(body: ChatRequest, db: DbDep, user: OptionalUserDep) -> ChatResponse:
 
 
 @router.get("/history/{session_id}")
-def history(session_id: str, db: DbDep) -> HistoryResponse:
-    messages = [
-        HistoryMessage(role=m.role, content=m.content)
-        for m in repo.history_for_session(db, session_id)
-    ]
+def history(session_id: str, db: DbDep, user: OptionalUserDep) -> HistoryResponse:
+    rows = repo.history_for_session(db, session_id)
+
+    # 로그인 사용자의 대화가 섞인 세션은 그 사용자 본인만 조회할 수 있다
+    owner_ids = {m.user_id for m in rows if m.user_id is not None}
+    if owner_ids and (user is None or owner_ids != {user.id}):
+        raise HTTPException(status_code=403, detail="이 대화 이력을 볼 권한이 없습니다")
+
+    messages = [HistoryMessage(role=m.role, content=m.content) for m in rows]
     return HistoryResponse(session_id=session_id, messages=messages)

@@ -8,23 +8,30 @@ from app.db.vector_base import VectorBase
 from app.db.vector_models import ProductEmbedding
 from app.tools.catalog import ProductDoc
 
-_UPSERT_COLUMNS = (
-    "category",
-    "bank",
-    "name",
-    "text",
-    "content_hash",
-    "disclosure_month",
-    "embedding",
+# 모델에서 파생 — 컬럼을 추가해도 upsert 갱신 목록이 자동으로 따라온다
+UPSERT_COLUMNS: tuple[str, ...] = tuple(
+    column.name for column in ProductEmbedding.__table__.columns if not column.primary_key
 )
 _CHUNK_SIZE = 200
 
 
 def ensure_vector_schema(engine: Engine) -> None:
-    """pgvector 확장과 테이블을 준비한다. PostgreSQL에서만 호출할 것."""
+    """pgvector 확장·테이블·ANN 인덱스를 준비한다. PostgreSQL에서만 호출할 것."""
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     VectorBase.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_product_embeddings_embedding_hnsw "
+                "ON product_embeddings USING hnsw (embedding vector_cosine_ops)"
+            )
+        )
+
+
+def index_ready(db: Session) -> bool:
+    """색인에 문서가 1건이라도 있는지 — 도구가 '미준비' 안내를 구분하는 기준."""
+    return db.scalar(select(ProductEmbedding.product_key).limit(1)) is not None
 
 
 def existing_hashes(db: Session) -> dict[str, str]:
@@ -54,7 +61,7 @@ def upsert_docs(db: Session, pairs: list[tuple[ProductDoc, list[float]]]) -> Non
         db.execute(
             statement.on_conflict_do_update(
                 index_elements=["product_key"],
-                set_={column: statement.excluded[column] for column in _UPSERT_COLUMNS},
+                set_={column: statement.excluded[column] for column in UPSERT_COLUMNS},
             )
         )
 
@@ -71,11 +78,14 @@ def search_similar(
     *,
     top_k: int = 5,
     category: str | None = None,
+    exclude_category: str | None = None,
 ) -> list[tuple[ProductEmbedding, float]]:
     """질의 벡터와 코사인 거리가 가까운 상품을 반환한다. (거리가 작을수록 유사)"""
     distance = ProductEmbedding.embedding.cosine_distance(query_vector)
     statement = select(ProductEmbedding, distance.label("distance"))
     if category:
         statement = statement.where(ProductEmbedding.category == category)
+    if exclude_category:
+        statement = statement.where(ProductEmbedding.category != exclude_category)
     statement = statement.order_by(distance).limit(top_k)
     return [(row[0], float(row[1])) for row in db.execute(statement)]

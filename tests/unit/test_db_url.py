@@ -12,9 +12,18 @@ def test_구형_postgres_스킴도_처리한다() -> None:
     assert normalize_db_url("postgres://u:p@host/db").startswith("postgresql+psycopg://")
 
 
-def test_이미_드라이버가_지정됐으면_그대로_둔다() -> None:
+def test_이미_psycopg_드라이버면_그대로_둔다() -> None:
     url = "postgresql+psycopg://u:p@host/db"
     assert normalize_db_url(url) == url
+
+
+def test_다른_드라이버_지정도_psycopg로_통일한다() -> None:
+    assert normalize_db_url("postgresql+asyncpg://u:p@host/db") == (
+        "postgresql+psycopg://u:p@host/db"
+    )
+    assert normalize_db_url("postgresql+psycopg2://u:p@host/db") == (
+        "postgresql+psycopg://u:p@host/db"
+    )
 
 
 def test_sqlite_주소는_건드리지_않는다() -> None:

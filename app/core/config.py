@@ -1,6 +1,9 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_DATABASE_URL = "sqlite:///./data/app.db"
 
 
 class Settings(BaseSettings):
@@ -13,9 +16,15 @@ class Settings(BaseSettings):
     finlife_api_key: str = ""
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
-    database_url: str = "sqlite:///./data/app.db"
+    database_url: str = _DEFAULT_DATABASE_URL
     demo_username: str = "demo"
     demo_password: str = "demo1234!"
+
+    @field_validator("database_url")
+    @classmethod
+    def _empty_database_url_falls_back(cls, value: str) -> str:
+        """.env에 `DATABASE_URL=`처럼 빈 값이 있으면 기본 SQLite로 폴백한다."""
+        return value.strip() or _DEFAULT_DATABASE_URL
 
 
 @lru_cache

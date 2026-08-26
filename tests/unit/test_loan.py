@@ -174,3 +174,15 @@ def test_대출_포맷에_은행_금리범위_유형이_들어간다() -> None:
 def test_신용대출_포맷과_빈_목록_안내() -> None:
     assert "없" in format_credit_loans([])
     assert "없" in format_secured_loans([], kind="전세자금대출")
+
+
+@respx.mock
+def test_상한금리_0은_하한으로_치환되지_않는다() -> None:
+    data = payload(
+        base_rows=[loan_base("A", "P1", "가은행", "가주담대")],
+        option_rows=[mortgage_option("A", "P1", 3.5, 0.0)],
+    )
+    respx.get(MORTGAGE_URL).mock(return_value=httpx.Response(200, json=data))
+    with httpx.Client() as client:
+        loans = search_mortgage_loans(client, api_key="key")
+    assert loans[0].rate_max == 0.0

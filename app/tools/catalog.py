@@ -14,7 +14,17 @@ from typing import Any
 import httpx
 from pydantic import BaseModel
 
-from app.tools.finlife import BANK, fetch_all
+from app.tools.finlife import (
+    BANK,
+    CREDIT_ENDPOINT,
+    DEPOSIT_ENDPOINT,
+    MORTGAGE_ENDPOINT,
+    RENT_ENDPOINT,
+    SAVING_ENDPOINT,
+    fetch_all,
+    to_float,
+    to_int,
+)
 
 _ProductKey = tuple[str, str]
 
@@ -31,22 +41,23 @@ class ProductDoc(BaseModel):
 
     @property
     def content_hash(self) -> str:
-        """본문이 바뀌었는지 판단하는 지문 — 바뀐 상품만 다시 임베딩한다."""
-        return hashlib.sha256(self.text.encode("utf-8")).hexdigest()[:32]
+        """저장되는 모든 필드가 지문에 들어가야 변경이 감지된다 (공시월 포함)."""
+        payload = "\n".join((self.category, self.bank, self.name, self.disclosure_month, self.text))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
 
 def _savings_option_line(option: dict[str, Any]) -> str | None:
     """예금·적금 금리 옵션 한 줄."""
-    term = option.get("save_trm")
-    if not term:
+    term = to_int(option.get("save_trm"))
+    if term is None:
         return None
-    parts = [f"{int(term)}개월"]
-    base_rate = option.get("intr_rate")
+    parts = [f"{term}개월"]
+    base_rate = to_float(option.get("intr_rate"))
     if base_rate is not None:
-        parts.append(f"기본 {float(base_rate):.2f}%")
-    max_rate = option.get("intr_rate2")
+        parts.append(f"기본 {base_rate:.2f}%")
+    max_rate = to_float(option.get("intr_rate2"))
     if max_rate is not None:
-        parts.append(f"최고 {float(max_rate):.2f}%")
+        parts.append(f"최고 {max_rate:.2f}%")
     reserve_type = option.get("rsrv_type_nm")
     if reserve_type:
         parts.append(str(reserve_type))
@@ -55,7 +66,7 @@ def _savings_option_line(option: dict[str, Any]) -> str | None:
 
 def _secured_option_line(option: dict[str, Any]) -> str | None:
     """주택담보·전세자금대출 금리 옵션 한 줄."""
-    rate_min = option.get("lend_rate_min")
+    rate_min = to_float(option.get("lend_rate_min"))
     if rate_min is None:
         return None
     parts = [
@@ -63,21 +74,25 @@ def _secured_option_line(option: dict[str, Any]) -> str | None:
         for key in ("mrtg_type_nm", "rpay_type_nm", "lend_rate_type_nm")
         if option.get(key)
     ]
-    rate_max = option.get("lend_rate_max") or rate_min
-    parts.append(f"{float(rate_min):.2f}%~{float(rate_max):.2f}%")
+    rate_max = to_float(option.get("lend_rate_max"))
+    if rate_max is None:
+        rate_max = rate_min
+    parts.append(f"{rate_min:.2f}%~{rate_max:.2f}%")
     return " ".join(parts)
 
 
 def _credit_option_line(option: dict[str, Any]) -> str | None:
-    """개인신용대출 금리 옵션 한 줄."""
-    average = option.get("crdt_grad_avg")
+    """개인신용대출 금리 옵션 한 줄 — 비교 도구와 동일하게 대출금리(A) 유형만 쓴다."""
+    if option.get("crdt_lend_rate_type") != "A":
+        return None
+    average = to_float(option.get("crdt_grad_avg"))
     if average is None:
         return None
     label = option.get("crdt_lend_rate_type_nm") or "대출금리"
-    line = f"{label} 평균 {float(average):.2f}%"
-    best = option.get("crdt_grad_1")
+    line = f"{label} 평균 {average:.2f}%"
+    best = to_float(option.get("crdt_grad_1"))
     if best is not None:
-        line += f" (900점초과 {float(best):.2f}%)"
+        line += f" (900점초과 {best:.2f}%)"
     return line
 
 
@@ -111,36 +126,22 @@ class _Source:
 
 
 _SOURCES = (
-    _Source(
-        "deposit", "정기예금", "depositProductsSearch.json", _savings_option_line, _SAVINGS_FIELDS
-    ),
-    _Source("saving", "적금", "savingProductsSearch.json", _savings_option_line, _SAVINGS_FIELDS),
-    _Source(
-        "mortgage",
-        "주택담보대출",
-        "mortgageLoanProductsSearch.json",
-        _secured_option_line,
-        _LOAN_FIELDS,
-    ),
-    _Source(
-        "rent",
-        "전세자금대출",
-        "rentHouseLoanProductsSearch.json",
-        _secured_option_line,
-        _LOAN_FIELDS,
-    ),
-    _Source(
-        "credit",
-        "개인신용대출",
-        "creditLoanProductsSearch.json",
-        _credit_option_line,
-        _CREDIT_FIELDS,
-    ),
+    _Source("deposit", "정기예금", DEPOSIT_ENDPOINT, _savings_option_line, _SAVINGS_FIELDS),
+    _Source("saving", "적금", SAVING_ENDPOINT, _savings_option_line, _SAVINGS_FIELDS),
+    _Source("mortgage", "주택담보대출", MORTGAGE_ENDPOINT, _secured_option_line, _LOAN_FIELDS),
+    _Source("rent", "전세자금대출", RENT_ENDPOINT, _secured_option_line, _LOAN_FIELDS),
+    _Source("credit", "개인신용대출", CREDIT_ENDPOINT, _credit_option_line, _CREDIT_FIELDS),
 )
+
+# 검색 필터 등에서 쓰는 카테고리 어휘의 단일 출처
+CATEGORIES: tuple[str, ...] = tuple(source.category for source in _SOURCES)
+CREDIT_CATEGORY = "개인신용대출"
 
 
 def _clean(value: Any) -> str:
-    """공시 원문에 섞인 앞뒤 공백과 줄바꿈을 정리한다."""
+    """공시 원문의 앞뒤 공백·줄바꿈을 정리한다. 결측(None)은 빈 문자열."""
+    if value is None:
+        return ""
     return " ".join(str(value).split())
 
 

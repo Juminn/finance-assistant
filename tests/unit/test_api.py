@@ -34,9 +34,12 @@ def fake_agent(monkeypatch: pytest.MonkeyPatch) -> FakeAgent:
 
 @pytest.fixture
 def client(fake_agent: FakeAgent) -> Iterator[TestClient]:
+    from app.db import session as session_module
+
     app = create_app(engine=make_engine("sqlite://"))
     with TestClient(app) as test_client:
         yield test_client
+    session_module.set_engine(None)
 
 
 def test_데모_계정으로_로그인하면_토큰을_받는다(client: TestClient) -> None:
@@ -90,6 +93,43 @@ def test_로그인한_요청은_인증_컨텍스트로_실행된다(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert fake_agent.calls[-1]["authenticated"] is True
+
+
+def test_같은_세션이라도_인증_여부가_다르면_스레드가_분리된다(
+    client: TestClient, fake_agent: FakeAgent
+) -> None:
+    session_id = client.post("/api/chat", json={"message": "안녕"}).json()["session_id"]
+    token = client.post(
+        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
+    ).json()["token"]
+    client.post(
+        "/api/chat",
+        json={"message": "신용대출 알려줘", "session_id": session_id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    anon_thread = fake_agent.calls[0]["config"]["configurable"]["thread_id"]
+    auth_thread = fake_agent.calls[1]["config"]["configurable"]["thread_id"]
+    assert anon_thread != auth_thread
+
+
+def test_로그인_사용자의_대화_이력은_본인만_조회할_수_있다(
+    client: TestClient, fake_agent: FakeAgent
+) -> None:
+    token = client.post(
+        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
+    ).json()["token"]
+    session_id = client.post(
+        "/api/chat",
+        json={"message": "신용대출 알려줘"},
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()["session_id"]
+
+    anonymous = client.get(f"/api/history/{session_id}")
+    assert anonymous.status_code == 403
+
+    owner = client.get(f"/api/history/{session_id}", headers={"Authorization": f"Bearer {token}"})
+    assert owner.status_code == 200
+    assert len(owner.json()["messages"]) == 2
 
 
 def test_에이전트가_실패하면_502와_안내_메시지를_준다(
