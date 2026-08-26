@@ -11,7 +11,9 @@ from sqlalchemy.orm import sessionmaker
 from app.api import auth, chat
 from app.core.config import get_settings
 from app.db import repo
-from app.db.base import Base, make_engine
+from app.db.base import Base
+from app.db.session import get_engine
+from app.db.vector_repo import ensure_vector_schema
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 
@@ -23,8 +25,10 @@ def create_app(engine: Engine | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        db_engine = engine or make_engine(settings.database_url)
+        db_engine = engine or get_engine()
         Base.metadata.create_all(db_engine)
+        if db_engine.dialect.name == "postgresql":
+            ensure_vector_schema(db_engine)
         app.state.session_factory = sessionmaker(bind=db_engine)
         with app.state.session_factory() as db:
             repo.ensure_user(db, settings.demo_username, settings.demo_password)

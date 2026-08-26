@@ -1,0 +1,39 @@
+"""OpenAI 임베딩 호출 — 클라이언트를 주입받아 테스트 가능하게 유지한다."""
+
+from typing import Any, Protocol
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIM = 1536
+_DEFAULT_BATCH_SIZE = 100
+
+
+class EmbeddingsResource(Protocol):
+    def create(self, *, model: str, input: list[str]) -> Any: ...
+
+
+class EmbeddingClient(Protocol):
+    """OpenAI 클라이언트와 테스트용 가짜 클라이언트가 모두 만족하는 최소 인터페이스."""
+
+    @property
+    def embeddings(self) -> EmbeddingsResource: ...
+
+
+def embed_texts(
+    client: EmbeddingClient,
+    texts: list[str],
+    *,
+    model: str = EMBEDDING_MODEL,
+    batch_size: int = _DEFAULT_BATCH_SIZE,
+) -> list[list[float]]:
+    """텍스트 목록을 입력 순서 그대로의 벡터 목록으로 바꾼다."""
+    if batch_size <= 0:
+        raise ValueError("batch_size는 1 이상이어야 합니다")
+    if not texts:
+        return []
+
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), batch_size):
+        chunk = texts[start : start + batch_size]
+        response = client.embeddings.create(model=model, input=chunk)
+        vectors.extend([float(value) for value in item.embedding] for item in response.data)
+    return vectors

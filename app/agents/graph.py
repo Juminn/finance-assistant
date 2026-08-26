@@ -28,6 +28,7 @@ from app.agents.tools import (
     compare_mortgage_loans,
     compare_rent_loans,
     compare_saving_products,
+    search_products_by_condition,
 )
 from app.core.config import get_settings
 
@@ -78,12 +79,17 @@ def build_graph(
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     deposit_agent = create_agent(
         _chat_model(),
-        tools=[compare_deposit_products, compare_saving_products],
+        tools=[compare_deposit_products, compare_saving_products, search_products_by_condition],
         system_prompt=DEPOSIT_AGENT_SYSTEM,
     )
     loan_agent = create_agent(
         _chat_model(),
-        tools=[compare_mortgage_loans, compare_rent_loans, compare_credit_loans],
+        tools=[
+            compare_mortgage_loans,
+            compare_rent_loans,
+            compare_credit_loans,
+            search_products_by_condition,
+        ],
         system_prompt=LOAN_AGENT_SYSTEM,
     )
 
