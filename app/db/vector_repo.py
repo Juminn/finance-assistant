@@ -37,7 +37,8 @@ def index_ready(db: Session) -> bool:
 def existing_hashes(db: Session) -> dict[str, str]:
     """이미 색인된 (product_key → content_hash) 맵."""
     rows = db.execute(select(ProductEmbedding.product_key, ProductEmbedding.content_hash))
-    return dict(rows.tuples())
+    # dict(result)는 Result의 keys()를 매핑 프로토콜로 오인하므로 all()로 행 목록을 넘긴다
+    return dict(rows.tuples().all())
 
 
 def upsert_docs(db: Session, pairs: list[tuple[ProductDoc, list[float]]]) -> None:
