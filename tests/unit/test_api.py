@@ -68,6 +68,18 @@ def test_답변의_개인정보는_마스킹되어_나간다(client: TestClient,
     assert "900101-1234567" not in response.json()["reply"]
 
 
+def test_에이전트가_실패하면_502와_안내_메시지를_준다(
+    client: TestClient, fake_agent: FakeAgent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("LLM down")
+
+    monkeypatch.setattr(fake_agent, "invoke", boom)
+    response = client.post("/api/chat", json={"message": "안녕"})
+    assert response.status_code == 502
+    assert "오류" in response.json()["detail"]
+
+
 def test_대화_이력을_세션별로_조회한다(client: TestClient) -> None:
     session_id = client.post("/api/chat", json={"message": "안녕"}).json()["session_id"]
     response = client.get(f"/api/history/{session_id}")

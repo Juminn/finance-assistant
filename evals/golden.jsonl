@@ -1,0 +1,24 @@
+{"question": "1년 정기예금 금리 비교해줘", "intent": "deposit"}
+{"question": "적금 뭐가 좋아?", "intent": "deposit"}
+{"question": "목돈 5천만원 어디에 맡기는 게 좋을까", "intent": "deposit"}
+{"question": "6개월 단기로 넣을 예금 추천해줘", "intent": "deposit"}
+{"question": "저축은행 예금 금리 알려줘", "intent": "deposit"}
+{"question": "정기예금이랑 적금 중에 뭐가 나아?", "intent": "deposit"}
+{"question": "금리 제일 높은 예금이 뭐야", "intent": "deposit"}
+{"question": "천만원을 1년 넣으면 이자 얼마나 받아?", "intent": "deposit"}
+{"question": "주택담보대출 금리 비교해줘", "intent": "loan"}
+{"question": "전세자금대출 알아보고 있어", "intent": "loan"}
+{"question": "신용대출 한도가 궁금해", "intent": "loan"}
+{"question": "대출 갈아타기 하고 싶은데", "intent": "loan"}
+{"question": "버팀목 전세대출 조건이 뭐야", "intent": "loan"}
+{"question": "마이너스통장 금리 어때?", "intent": "loan"}
+{"question": "집 살 때 돈 빌리려면 어떻게 해?", "intent": "loan"}
+{"question": "안녕", "intent": "general"}
+{"question": "고마워!", "intent": "general"}
+{"question": "예금자보호가 뭐야?", "intent": "general"}
+{"question": "기준금리가 오르면 어떻게 돼?", "intent": "general"}
+{"question": "복리가 뭔지 설명해줘", "intent": "general"}
+{"question": "코스피가 뭐야", "intent": "general"}
+{"question": "너는 뭘 할 수 있어?", "intent": "general"}
+{"question": "환율은 왜 오르는 거야", "intent": "general"}
+{"question": "ISA 계좌가 뭔가요", "intent": "general"}

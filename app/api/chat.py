@@ -1,9 +1,10 @@
 # langgraph 그래프의 제네릭이 부분적으로 Unknown이라 invoke 지점만 완화한다
 # pyright: reportUnknownMemberType=false
 
+import logging
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
@@ -38,10 +39,16 @@ class HistoryResponse(BaseModel):
 @router.post("/chat")
 def chat(body: ChatRequest, db: DbDep, user: OptionalUserDep) -> ChatResponse:
     session_id = body.session_id or uuid4().hex
-    result = get_agent().invoke(
-        {"messages": [HumanMessage(body.message)]},
-        config={"configurable": {"thread_id": session_id}},
-    )
+    try:
+        result = get_agent().invoke(
+            {"messages": [HumanMessage(body.message)]},
+            config={"configurable": {"thread_id": session_id}},
+        )
+    except Exception:
+        logging.exception("에이전트 호출 실패 (session_id=%s)", session_id)
+        raise HTTPException(
+            status_code=502, detail="답변 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+        ) from None
     reply = mask_pii(str(result["messages"][-1].content))
 
     user_id = user.id if user else None

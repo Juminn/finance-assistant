@@ -15,5 +15,6 @@ data/
 *.sqlite3
 *.db
 
-# 로컬 도구 설정
+# 로컬 도구 설정 (머신 종속 경로 포함)
 .claude/settings.local.json
+.claude/launch.json
