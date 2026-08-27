@@ -41,7 +41,7 @@ def _with_client(run: Callable[[httpx.Client, str], str]) -> str:
 
 @tool
 def compare_deposit_products(term_months: int = 12, top_n: int = 5) -> str:
-    """은행 정기예금 상품을 최고우대금리 순으로 비교한다.
+    """정기예금 상품을 최고우대금리 순으로 비교한다. 은행과 저축은행을 함께 본다.
 
     Args:
         term_months: 저축 기간(개월). 6, 12, 24, 36 중 하나가 일반적이다.
@@ -56,7 +56,7 @@ def compare_deposit_products(term_months: int = 12, top_n: int = 5) -> str:
 
 @tool
 def compare_saving_products(term_months: int = 12, top_n: int = 5) -> str:
-    """은행 적금 상품을 최고우대금리 순으로 비교한다.
+    """적금 상품을 최고우대금리 순으로 비교한다. 은행과 저축은행을 함께 본다.
 
     Args:
         term_months: 적립 기간(개월). 6, 12, 24, 36 중 하나가 일반적이다.
@@ -71,7 +71,7 @@ def compare_saving_products(term_months: int = 12, top_n: int = 5) -> str:
 
 @tool
 def compare_mortgage_loans(top_n: int = 5) -> str:
-    """은행 주택담보대출 상품을 최저금리 순으로 비교한다.
+    """주택담보대출 상품을 최저금리 순으로 비교한다. 은행·저축은행·보험사를 함께 본다.
 
     Args:
         top_n: 상위 몇 개 상품을 보여줄지.
@@ -85,7 +85,7 @@ def compare_mortgage_loans(top_n: int = 5) -> str:
 
 @tool
 def compare_rent_loans(top_n: int = 5) -> str:
-    """은행 전세자금대출 상품을 최저금리 순으로 비교한다.
+    """전세자금대출 상품을 최저금리 순으로 비교한다. 은행·저축은행·보험사를 함께 본다.
 
     Args:
         top_n: 상위 몇 개 상품을 보여줄지.
@@ -99,7 +99,9 @@ def compare_rent_loans(top_n: int = 5) -> str:
 
 @tool
 def compare_credit_loans(top_n: int = 5) -> str:
-    """은행 개인신용대출 상품을 평균금리가 낮은 순으로 비교한다. 로그인한 사용자만 쓸 수 있다.
+    """개인신용대출 상품을 평균금리가 낮은 순으로 비교한다.
+
+    은행·저축은행·카드사 등을 함께 본다. 로그인한 사용자만 쓸 수 있다.
 
     Args:
         top_n: 상위 몇 개 상품을 보여줄지.

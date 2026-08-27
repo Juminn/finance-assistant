@@ -4,7 +4,15 @@ import httpx
 import pytest
 import respx
 
-from app.tools.finlife import BANK, BASE_URL, FinlifeError, fetch_all, fetch_page
+from app.tools.finlife import (
+    BANK,
+    BASE_URL,
+    SAVING_BANK,
+    FinlifeError,
+    fetch_all,
+    fetch_all_groups,
+    fetch_page,
+)
 
 ENDPOINT = "depositProductsSearch.json"
 URL = f"{BASE_URL}/{ENDPOINT}"
@@ -85,3 +93,49 @@ def test_같은_상품코드가_중복_공시돼도_두_건_모두_보존한다(
     # 첫 건은 원래 코드를 유지하고, 중복분만 접미사로 구분한다
     assert bases[("0010016", "WR0002F")]["fin_prdt_nm"] == "마이너스한도대출"
     assert bases[("0010016", "WR0002F#2")]["fin_prdt_nm"] == "장기카드대출"
+
+
+@respx.mock
+def test_여러_권역을_합쳐_조회한다() -> None:
+    respx.get(URL, params={"topFinGrpNo": BANK}).mock(
+        return_value=httpx.Response(
+            200,
+            json=ok_result(
+                baseList=[{"fin_co_no": "0010001", "fin_prdt_cd": "P1", "kor_co_nm": "가은행"}],
+                optionList=[{"fin_co_no": "0010001", "fin_prdt_cd": "P1", "save_trm": "12"}],
+            ),
+        )
+    )
+    respx.get(URL, params={"topFinGrpNo": SAVING_BANK}).mock(
+        return_value=httpx.Response(
+            200,
+            json=ok_result(
+                baseList=[{"fin_co_no": "0020001", "fin_prdt_cd": "S1", "kor_co_nm": "가저축은행"}],
+                optionList=[{"fin_co_no": "0020001", "fin_prdt_cd": "S1", "save_trm": "12"}],
+            ),
+        )
+    )
+    with httpx.Client() as client:
+        bases, options = fetch_all_groups(
+            client, ENDPOINT, api_key="key", groups=(BANK, SAVING_BANK)
+        )
+
+    assert set(bases) == {("0010001", "P1"), ("0020001", "S1")}
+    assert len(options) == 2
+
+
+@respx.mock
+def test_권역_응답이_겹쳐도_같은_행을_두_번_담지_않는다() -> None:
+    # 권역별 응답을 합칠 때 완전히 동일한 옵션 행이 중복 계상되면 안 된다
+    body = ok_result(
+        baseList=[{"fin_co_no": "0010001", "fin_prdt_cd": "P1", "kor_co_nm": "가은행"}],
+        optionList=[{"fin_co_no": "0010001", "fin_prdt_cd": "P1", "save_trm": "12"}],
+    )
+    respx.get(URL).mock(return_value=httpx.Response(200, json=body))
+    with httpx.Client() as client:
+        bases, options = fetch_all_groups(
+            client, ENDPOINT, api_key="key", groups=(BANK, SAVING_BANK)
+        )
+
+    assert len(bases) == 1
+    assert len(options) == 1

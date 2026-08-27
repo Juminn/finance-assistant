@@ -4,7 +4,7 @@ import httpx
 import respx
 
 from app.tools.deposit import DepositProduct, format_deposit_products, search_deposit_products
-from app.tools.finlife import BASE_URL
+from app.tools.finlife import BANK, BASE_URL, SAVING_BANK
 
 URL = f"{BASE_URL}/depositProductsSearch.json"
 
@@ -108,7 +108,10 @@ def test_여러_페이지를_전부_수집한다() -> None:
     )
 
     with httpx.Client() as client:
-        products = search_deposit_products(client, api_key="key", term_months=12, top_n=10)
+        # 페이징 자체를 보는 테스트라 권역 하나로 좁힌다
+        products = search_deposit_products(
+            client, api_key="key", bank_groups=(BANK,), term_months=12, top_n=10
+        )
 
     assert [p.bank for p in products] == ["나은행", "가은행"]
 
@@ -181,3 +184,59 @@ def test_기본정보가_없는_고아_옵션은_제외한다() -> None:
         products = search_deposit_products(client, api_key="key", term_months=12)
 
     assert [p.bank for p in products] == ["가은행"]
+
+
+@respx.mock
+def test_기본값이_은행_외_권역까지_비교한다() -> None:
+    # 조건 검색(DB)은 전 권역을 담는데 금리 비교만 은행이면 같은 질문에 답이 갈린다
+    respx.get(URL, params={"topFinGrpNo": BANK}).mock(
+        return_value=httpx.Response(
+            200,
+            json=page(
+                [base_item("A", "P1", "가은행", "가예금")],
+                [option_item("A", "P1", "12", 2.0, 3.0)],
+            ),
+        )
+    )
+    respx.get(URL, params={"topFinGrpNo": SAVING_BANK}).mock(
+        return_value=httpx.Response(
+            200,
+            json=page(
+                [base_item("Z", "S1", "가저축은행", "가저축예금")],
+                [option_item("Z", "S1", "12", 3.5, 4.2)],
+            ),
+        )
+    )
+    respx.get(URL).mock(return_value=httpx.Response(200, json=page([], [])))
+
+    with httpx.Client() as client:
+        products = search_deposit_products(client, api_key="key", term_months=12, top_n=5)
+
+    assert [p.bank for p in products] == ["가저축은행", "가은행"]  # 금리 높은 순
+
+
+@respx.mock
+def test_같은_상품의_단리_복리_옵션은_한_번만_담고_높은_금리를_쓴다() -> None:
+    # 저축은행 상품은 같은 기간에 단리/복리 옵션이 따로 공시된다.
+    # 그대로 두면 같은 상품이 top_n 자리를 두 번 차지한다.
+    respx.get(URL).mock(
+        return_value=httpx.Response(
+            200,
+            json=page(
+                [
+                    base_item("A", "P1", "가저축은행", "가예금"),
+                    base_item("B", "P2", "나은행", "나예금"),
+                ],
+                [
+                    option_item("A", "P1", "12", 3.9, 4.11),
+                    option_item("A", "P1", "12", 3.8, 4.05),  # 같은 상품·같은 기간
+                    option_item("B", "P2", "12", 3.0, 3.5),
+                ],
+            ),
+        )
+    )
+    with httpx.Client() as client:
+        products = search_deposit_products(client, api_key="key", term_months=12, top_n=5)
+
+    assert [p.bank for p in products] == ["가저축은행", "나은행"]
+    assert products[0].max_rate == 4.11  # 더 높은 쪽을 남긴다

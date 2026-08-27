@@ -1,9 +1,11 @@
 """적금 상품 비교 도구."""
 
+from collections.abc import Sequence
+
 import httpx
 from pydantic import BaseModel
 
-from app.tools.finlife import BANK, fetch_all
+from app.tools.finlife import ALL_GROUPS, fetch_all_groups
 from app.tools.finlife import SAVING_ENDPOINT as _ENDPOINT
 
 
@@ -23,14 +25,15 @@ def search_saving_products(
     client: httpx.Client,
     *,
     api_key: str,
-    bank_group: str = BANK,
+    bank_groups: Sequence[str] = ALL_GROUPS,
     term_months: int = 12,
     top_n: int = 5,
 ) -> list[SavingProduct]:
     """적금 상품을 조회해 최고우대금리 내림차순 상위 top_n개를 반환한다."""
-    bases, options = fetch_all(client, _ENDPOINT, api_key=api_key, top_fin_grp_no=bank_group)
+    bases, options = fetch_all_groups(client, _ENDPOINT, api_key=api_key, groups=bank_groups)
 
-    products: list[SavingProduct] = []
+    # 같은 상품에 단리·복리 옵션이 따로 공시되므로 상품당 가장 높은 금리 한 건만 남긴다
+    best: dict[tuple[str, str], SavingProduct] = {}
     for option in options:
         if int(option.get("save_trm") or 0) != term_months:
             continue
@@ -39,21 +42,22 @@ def search_saving_products(
         base = bases.get((option["fin_co_no"], option["fin_prdt_cd"]))
         if base is None:
             continue
-        products.append(
-            SavingProduct(
-                bank=base["kor_co_nm"],
-                name=base["fin_prdt_nm"],
-                term_months=term_months,
-                base_rate=float(option.get("intr_rate") or 0.0),
-                max_rate=float(option["intr_rate2"]),
-                reserve_type=option.get("rsrv_type_nm") or "",
-                join_way=base.get("join_way") or "",
-                special_condition=(base.get("spcl_cnd") or "").strip(),
-                disclosure_month=base.get("dcls_month") or "",
-            )
+        candidate = SavingProduct(
+            bank=base["kor_co_nm"],
+            name=base["fin_prdt_nm"],
+            term_months=term_months,
+            base_rate=float(option.get("intr_rate") or 0.0),
+            max_rate=float(option["intr_rate2"]),
+            reserve_type=option.get("rsrv_type_nm") or "",
+            join_way=base.get("join_way") or "",
+            special_condition=(base.get("spcl_cnd") or "").strip(),
+            disclosure_month=base.get("dcls_month") or "",
         )
+        key = (option["fin_co_no"], option["fin_prdt_cd"])
+        if key not in best or candidate.max_rate > best[key].max_rate:
+            best[key] = candidate
 
-    products.sort(key=lambda p: p.max_rate, reverse=True)
+    products = sorted(best.values(), key=lambda p: p.max_rate, reverse=True)
     return products[:top_n]
 
 

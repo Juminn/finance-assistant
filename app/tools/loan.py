@@ -1,11 +1,13 @@
 """대출 상품 비교 도구 — 주택담보·전세자금·개인신용."""
 
+from collections.abc import Sequence
+
 import httpx
 from pydantic import BaseModel
 
 from app.tools.finlife import (
-    BANK,
-    fetch_all,
+    ALL_GROUPS,
+    fetch_all_groups,
     to_float,
 )
 from app.tools.finlife import (
@@ -46,10 +48,10 @@ def _search_secured(
     endpoint: str,
     *,
     api_key: str,
-    bank_group: str,
+    bank_groups: Sequence[str],
     top_n: int,
 ) -> list[SecuredLoan]:
-    bases, options = fetch_all(client, endpoint, api_key=api_key, top_fin_grp_no=bank_group)
+    bases, options = fetch_all_groups(client, endpoint, api_key=api_key, groups=bank_groups)
 
     best: dict[tuple[str, str], SecuredLoan] = {}
     for option in options:
@@ -79,28 +81,28 @@ def _search_secured(
 
 
 def search_mortgage_loans(
-    client: httpx.Client, *, api_key: str, bank_group: str = BANK, top_n: int = 5
+    client: httpx.Client, *, api_key: str, bank_groups: Sequence[str] = ALL_GROUPS, top_n: int = 5
 ) -> list[SecuredLoan]:
     """주택담보대출을 상품별 최저금리 기준 오름차순으로 반환한다."""
     return _search_secured(
-        client, _MORTGAGE_ENDPOINT, api_key=api_key, bank_group=bank_group, top_n=top_n
+        client, _MORTGAGE_ENDPOINT, api_key=api_key, bank_groups=bank_groups, top_n=top_n
     )
 
 
 def search_rent_loans(
-    client: httpx.Client, *, api_key: str, bank_group: str = BANK, top_n: int = 5
+    client: httpx.Client, *, api_key: str, bank_groups: Sequence[str] = ALL_GROUPS, top_n: int = 5
 ) -> list[SecuredLoan]:
     """전세자금대출을 상품별 최저금리 기준 오름차순으로 반환한다."""
     return _search_secured(
-        client, _RENT_ENDPOINT, api_key=api_key, bank_group=bank_group, top_n=top_n
+        client, _RENT_ENDPOINT, api_key=api_key, bank_groups=bank_groups, top_n=top_n
     )
 
 
 def search_credit_loans(
-    client: httpx.Client, *, api_key: str, bank_group: str = BANK, top_n: int = 5
+    client: httpx.Client, *, api_key: str, bank_groups: Sequence[str] = ALL_GROUPS, top_n: int = 5
 ) -> list[CreditLoan]:
     """개인신용대출을 평균금리 오름차순으로 반환한다. 대출금리 유형(A) 옵션만 사용한다."""
-    bases, options = fetch_all(client, _CREDIT_ENDPOINT, api_key=api_key, top_fin_grp_no=bank_group)
+    bases, options = fetch_all_groups(client, _CREDIT_ENDPOINT, api_key=api_key, groups=bank_groups)
 
     best: dict[tuple[str, str], CreditLoan] = {}
     for option in options:
