@@ -3,7 +3,7 @@ from typing import Any
 import httpx
 import respx
 
-from app.tools.finlife import BASE_URL
+from app.tools.finlife import BANK, BASE_URL, CREDIT_FINANCE
 from app.tools.loan import (
     format_credit_loans,
     format_secured_loans,
@@ -186,3 +186,63 @@ def test_상한금리_0은_하한으로_치환되지_않는다() -> None:
     with httpx.Client() as client:
         loans = search_mortgage_loans(client, api_key="key")
     assert loans[0].rate_max == 0.0
+
+
+@respx.mock
+def test_신용대출도_기본값이_전_권역이다() -> None:
+    respx.get(CREDIT_URL, params={"topFinGrpNo": BANK}).mock(
+        return_value=httpx.Response(
+            200,
+            json=payload(
+                [
+                    {
+                        "fin_co_no": "A",
+                        "fin_prdt_cd": "P1",
+                        "kor_co_nm": "가은행",
+                        "fin_prdt_nm": "가신용",
+                        "dcls_month": "202608",
+                    }
+                ],
+                [
+                    {
+                        "fin_co_no": "A",
+                        "fin_prdt_cd": "P1",
+                        "crdt_lend_rate_type": "A",
+                        "crdt_grad_avg": 6.0,
+                        "crdt_grad_1": 5.0,
+                    }
+                ],
+            ),
+        )
+    )
+    respx.get(CREDIT_URL, params={"topFinGrpNo": CREDIT_FINANCE}).mock(
+        return_value=httpx.Response(
+            200,
+            json=payload(
+                [
+                    {
+                        "fin_co_no": "K",
+                        "fin_prdt_cd": "C1",
+                        "kor_co_nm": "가카드",
+                        "fin_prdt_nm": "가카드론",
+                        "dcls_month": "202608",
+                    }
+                ],
+                [
+                    {
+                        "fin_co_no": "K",
+                        "fin_prdt_cd": "C1",
+                        "crdt_lend_rate_type": "A",
+                        "crdt_grad_avg": 4.5,
+                        "crdt_grad_1": 3.9,
+                    }
+                ],
+            ),
+        )
+    )
+    respx.get(CREDIT_URL).mock(return_value=httpx.Response(200, json=payload([], [])))
+
+    with httpx.Client() as client:
+        loans = search_credit_loans(client, api_key="key", top_n=5)
+
+    assert [loan.bank for loan in loans] == ["가카드", "가은행"]  # 평균금리 낮은 순
