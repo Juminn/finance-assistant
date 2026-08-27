@@ -13,7 +13,7 @@ import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.batch.sync import plan_sync
+from app.batch.sync import is_mass_deletion, plan_sync
 from app.core.config import get_settings
 from app.core.embeddings import embed_texts
 from app.db.session import get_engine, get_session_factory, vector_search_enabled
@@ -45,7 +45,9 @@ def main() -> int:
 
     session_factory = get_session_factory()
     with session_factory() as db:
-        plan = plan_sync(docs, existing_hashes(db))
+        existing = existing_hashes(db)
+    existing_count = len(existing)
+    plan = plan_sync(docs, existing)
     print(
         f"신규·변경 {len(plan.to_index)}건 / 그대로 {plan.unchanged}건"
         f" / 삭제 {len(plan.to_delete)}건"
@@ -60,7 +62,12 @@ def main() -> int:
             db.commit()
         print(f"색인 진행: {min(start + _CHUNK, len(plan.to_index))}/{len(plan.to_index)}")
 
-    if plan.to_delete:
+    if plan.to_delete and is_mass_deletion(len(plan.to_delete), existing_count=existing_count):
+        print(
+            f"삭제 {len(plan.to_delete)}건은 기존 색인 {existing_count}건에 비해 과도합니다."
+            " 수집이 일부만 된 것으로 보고 삭제를 건너뜁니다."
+        )
+    elif plan.to_delete:
         with session_factory() as db:
             delete_keys(db, plan.to_delete)
             db.commit()

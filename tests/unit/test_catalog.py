@@ -4,7 +4,7 @@ import httpx
 import respx
 
 from app.tools.catalog import collect_product_docs
-from app.tools.finlife import BASE_URL
+from app.tools.finlife import BANK, BASE_URL, SAVING_BANK
 
 ENDPOINTS = {
     "deposit": f"{BASE_URL}/depositProductsSearch.json",
@@ -353,3 +353,82 @@ def test_신용대출은_대출금리_유형A_옵션만_문서에_담는다() ->
         docs = collect_product_docs(client, api_key="key")
     assert "5.50" in docs[0].text
     assert "3.00" not in docs[0].text
+
+
+def base_row(co: str, code: str, bank: str, name: str) -> dict[str, Any]:
+    return {
+        "dcls_month": "202608",
+        "fin_co_no": co,
+        "fin_prdt_cd": code,
+        "kor_co_nm": bank,
+        "fin_prdt_nm": name,
+    }
+
+
+@respx.mock
+def test_은행_외_권역_상품도_수집한다() -> None:
+    for name, url in ENDPOINTS.items():
+        if name == "deposit":
+            continue
+        respx.get(url).mock(return_value=httpx.Response(200, json=empty()))
+
+    deposit_url = ENDPOINTS["deposit"]
+    respx.get(deposit_url, params={"topFinGrpNo": BANK}).mock(
+        return_value=httpx.Response(
+            200, json=page([base_row("0010001", "P1", "가은행", "가예금")], [])
+        )
+    )
+    respx.get(deposit_url, params={"topFinGrpNo": SAVING_BANK}).mock(
+        return_value=httpx.Response(
+            200, json=page([base_row("0020001", "S1", "가저축은행", "가저축예금")], [])
+        )
+    )
+    respx.get(deposit_url).mock(return_value=httpx.Response(200, json=empty()))
+
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+
+    assert {doc.product_key for doc in docs} == {"deposit:0010001:P1", "deposit:0020001:S1"}
+    assert {doc.bank for doc in docs} == {"가은행", "가저축은행"}
+
+
+@respx.mock
+def test_권역이_달라도_같은_상품키는_한_번만_담는다() -> None:
+    # product_key는 테이블 PK다. 중복이 섞이면 upsert가 한 문에서 같은 행을 두 번 건드려 깨진다.
+    mock_all(deposit=page([base_row("0010001", "P1", "가은행", "가예금")], []))
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+
+    keys = [doc.product_key for doc in docs]
+    assert keys == ["deposit:0010001:P1"]
+
+
+@respx.mock
+def test_중복_공시된_상품도_각각_문서가_되고_금리는_공유한다() -> None:
+    mock_all(
+        credit=page(
+            base_rows=[
+                {**base_row("0010016", "WR0002F", "아이엠뱅크", "마이너스한도대출")},
+                {**base_row("0010016", "WR0002F", "아이엠뱅크", "장기카드대출")},
+            ],
+            option_rows=[
+                {
+                    "fin_co_no": "0010016",
+                    "fin_prdt_cd": "WR0002F",
+                    "crdt_lend_rate_type": "A",
+                    "crdt_lend_rate_type_nm": "대출금리",
+                    "crdt_grad_avg": 6.22,
+                }
+            ],
+        )
+    )
+    with httpx.Client() as client:
+        docs = collect_product_docs(client, api_key="key")
+
+    assert {doc.name for doc in docs} == {"마이너스한도대출", "장기카드대출"}
+    assert {doc.product_key for doc in docs} == {
+        "credit:0010016:WR0002F",
+        "credit:0010016:WR0002F#2",
+    }
+    # 접미사가 붙은 쪽도 옵션(금리) 조인이 끊기면 안 된다
+    assert all("6.22" in doc.text for doc in docs)

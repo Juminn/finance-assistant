@@ -7,7 +7,7 @@
 
 import hashlib
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,12 +15,13 @@ import httpx
 from pydantic import BaseModel
 
 from app.tools.finlife import (
-    BANK,
+    ALL_GROUPS,
     CREDIT_ENDPOINT,
     DEPOSIT_ENDPOINT,
     MORTGAGE_ENDPOINT,
     RENT_ENDPOINT,
     SAVING_ENDPOINT,
+    base_product_code,
     fetch_all,
     to_float,
     to_int,
@@ -170,23 +171,32 @@ def _build_doc(
 
 
 def collect_product_docs(
-    client: httpx.Client, *, api_key: str, bank_group: str = BANK
+    client: httpx.Client, *, api_key: str, bank_groups: Sequence[str] = ALL_GROUPS
 ) -> list[ProductDoc]:
-    """다섯 카테고리의 전 상품을 수집해 임베딩용 문서 목록을 만든다."""
+    """다섯 카테고리의 전 권역 상품을 수집해 임베딩용 문서 목록을 만든다."""
     docs: list[ProductDoc] = []
+    seen: set[str] = set()
     for source in _SOURCES:
-        bases, options = fetch_all(
-            client, source.endpoint, api_key=api_key, top_fin_grp_no=bank_group
-        )
+        for bank_group in bank_groups:
+            bases, options = fetch_all(
+                client, source.endpoint, api_key=api_key, top_fin_grp_no=bank_group
+            )
 
-        grouped: dict[_ProductKey, list[str]] = defaultdict(list)
-        for option in options:
-            line = source.option_line(option)
-            if line is None:
-                continue
-            grouped[(option["fin_co_no"], option["fin_prdt_cd"])].append(line)
+            grouped: dict[_ProductKey, list[str]] = defaultdict(list)
+            for option in options:
+                line = source.option_line(option)
+                if line is None:
+                    continue
+                grouped[(option["fin_co_no"], option["fin_prdt_cd"])].append(line)
 
-        docs.extend(
-            _build_doc(source, key, base, grouped.get(key, [])) for key, base in bases.items()
-        )
+            for key, base in bases.items():
+                # 중복 공시분은 접미사가 붙어 있으므로 원래 코드로 금리를 찾는다
+                option_key = (key[0], base_product_code(key[1]))
+                doc = _build_doc(source, key, base, grouped.get(option_key, []))
+                # product_key는 테이블 PK다 — 중복이 섞이면
+                # upsert가 한 문에서 같은 행을 두 번 건드려 깨진다
+                if doc.product_key in seen:
+                    continue
+                seen.add(doc.product_key)
+                docs.append(doc)
     return docs
