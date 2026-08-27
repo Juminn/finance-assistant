@@ -29,8 +29,6 @@ uv run uvicorn app.api.main:app --reload --reload-dir app --reload-dir web
 (pgvector 확장은 앱이 자동으로 활성화합니다). 비워두면 로컬 SQLite로 동작하고,
 조건 검색 도구만 비활성화된 채 나머지 기능은 그대로 쓸 수 있습니다.
 
-데모 로그인 계정: `demo` / `demo1234!`
-
 ## 개발
 
 | 작업 | 명령 |

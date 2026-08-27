@@ -8,12 +8,11 @@ import httpx
 from langchain_core.tools import tool
 from openai import OpenAI
 
-from app.core.auth_context import is_authenticated
 from app.core.config import get_settings
 from app.core.embeddings import embed_texts
 from app.db.session import get_session_factory, vector_search_enabled
 from app.db.vector_repo import index_ready, search_similar
-from app.tools.catalog import CATEGORIES, CREDIT_CATEGORY
+from app.tools.catalog import CATEGORIES
 from app.tools.condition import format_matches, infer_category
 from app.tools.deposit import format_deposit_products, search_deposit_products
 from app.tools.finlife import FinlifeError
@@ -99,18 +98,11 @@ def compare_rent_loans(top_n: int = 5) -> str:
 
 @tool
 def compare_credit_loans(top_n: int = 5) -> str:
-    """개인신용대출 상품을 평균금리가 낮은 순으로 비교한다.
-
-    은행·저축은행·카드사 등을 함께 본다. 로그인한 사용자만 쓸 수 있다.
+    """개인신용대출 상품을 평균금리가 낮은 순으로 비교한다. 은행·저축은행·카드사 등을 함께 본다.
 
     Args:
         top_n: 상위 몇 개 상품을 보여줄지.
     """
-    if not is_authenticated():
-        return (
-            "[권한 안내] 개인신용대출 정보는 로그인 후 제공됩니다. "
-            "사용자에게 화면 우측 상단에서 로그인한 뒤 다시 물어봐 달라고 짧게 안내하라."
-        )
     return _with_client(
         lambda client, key: format_credit_loans(
             search_credit_loans(client, api_key=key, top_n=top_n)
@@ -120,10 +112,6 @@ def compare_credit_loans(top_n: int = 5) -> str:
 
 _TOP_K = 5
 _INDEX_NOT_READY = "조건 검색 색인이 아직 준비되지 않았습니다. 금리 비교 도구를 대신 사용하세요."
-_CREDIT_LOGIN_NOTICE = (
-    "[권한 안내] 개인신용대출 정보는 로그인 후 제공됩니다. "
-    "사용자에게 화면 우측 상단에서 로그인한 뒤 다시 물어봐 달라고 짧게 안내하라."
-)
 
 
 @lru_cache
@@ -157,13 +145,6 @@ def search_products_by_condition(query: str, category: str = "") -> str:
     inferred_category = infer_category(query) if not category else ""
     category = category or inferred_category
 
-    # 개인신용대출 정보는 비교 도구와 동일하게 로그인 사용자에게만 제공한다
-    exclude_category = None
-    if not is_authenticated():
-        if category == CREDIT_CATEGORY:
-            return _CREDIT_LOGIN_NOTICE
-        exclude_category = CREDIT_CATEGORY
-
     try:
         with get_session_factory()() as db:
             if not index_ready(db):
@@ -174,7 +155,6 @@ def search_products_by_condition(query: str, category: str = "") -> str:
                 vector,
                 top_k=_TOP_K,
                 category=category or None,
-                exclude_category=exclude_category,
             )
     except Exception:
         # 예외 원문(호스트명·계정 등)이 사용자 응답에 실리지 않게 로그로만 남긴다

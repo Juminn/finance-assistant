@@ -7,7 +7,6 @@ from pydantic_settings import SettingsConfigDict
 
 import app.agents.tools as tools_module
 from app.agents.tools import search_products_by_condition
-from app.core.auth_context import authenticated_request
 from app.core.config import Settings
 from app.db.vector_models import ProductEmbedding
 
@@ -66,29 +65,16 @@ def test_openai_키가_없으면_안내한다(monkeypatch: pytest.MonkeyPatch) -
     assert "키" in result
 
 
-def test_비로그인이_신용대출_카테고리를_지정하면_로그인_안내만_한다(
-    ready_backend: dict[str, Any],
-) -> None:
-    result = search_products_by_condition.invoke(
-        {"query": "금리 낮은 대출", "category": "개인신용대출"}
-    )
-    assert "로그인" in result
-    assert ready_backend["embed"] == 0  # 검색 자체가 실행되지 않아야 한다
-
-
-def test_비로그인_전체_검색은_신용대출을_제외한다(ready_backend: dict[str, Any]) -> None:
-    search_products_by_condition.invoke({"query": "우대금리"})
-    assert ready_backend["search_kwargs"]["exclude_category"] == "개인신용대출"
-
-
-def test_로그인하면_신용대출_카테고리도_검색된다(ready_backend: dict[str, Any]) -> None:
-    with authenticated_request(True):
-        search_products_by_condition.invoke(
-            {"query": "금리 낮은 신용대출", "category": "개인신용대출"}
-        )
+def test_신용대출_카테고리도_그대로_검색한다(ready_backend: dict[str, Any]) -> None:
+    # 금감원 공시 데이터라 다른 카테고리와 달리 취급할 이유가 없다
+    search_products_by_condition.invoke({"query": "금리 낮은 신용대출", "category": "개인신용대출"})
     assert ready_backend["embed"] == 1
     assert ready_backend["search_kwargs"]["category"] == "개인신용대출"
-    assert ready_backend["search_kwargs"]["exclude_category"] is None
+
+
+def test_전체_검색은_어떤_카테고리도_제외하지_않는다(ready_backend: dict[str, Any]) -> None:
+    search_products_by_condition.invoke({"query": "우대금리"})
+    assert ready_backend["search_kwargs"]["category"] is None
 
 
 def test_색인이_비어있으면_미준비_안내를_한다(
@@ -143,30 +129,23 @@ def test_검색_결과가_포맷되어_반환된다(ready_backend: dict[str, Any
 
 
 def test_카테고리를_안_줘도_질의에서_추론해_좁힌다(ready_backend: dict[str, Any]) -> None:
-    with authenticated_request(True):
-        result = search_products_by_condition.invoke({"query": "급여이체 우대 있는 적금"})
+    result = search_products_by_condition.invoke({"query": "급여이체 우대 있는 적금"})
     assert ready_backend["search_kwargs"]["category"] == "적금"
     assert "적금" in result  # 좁혀 검색했음을 결과에 밝힌다
 
 
 def test_명시한_카테고리가_추론보다_우선한다(ready_backend: dict[str, Any]) -> None:
-    with authenticated_request(True):
-        search_products_by_condition.invoke(
-            {"query": "주택담보대출처럼 쓸 수 있는 상품", "category": "적금"}
-        )
+    search_products_by_condition.invoke(
+        {"query": "주택담보대출처럼 쓸 수 있는 상품", "category": "적금"}
+    )
     assert ready_backend["search_kwargs"]["category"] == "적금"
 
 
-def test_추론_결과가_신용대출이면_비로그인은_로그인_안내를_받는다(
-    ready_backend: dict[str, Any],
-) -> None:
-    # 카테고리를 명시했을 때와 같은 권한 정책이 적용돼야 한다
-    result = search_products_by_condition.invoke({"query": "마이너스통장 만들 수 있는 곳"})
-    assert "로그인" in result
-    assert ready_backend["embed"] == 0
+def test_추론_결과가_신용대출이어도_그대로_검색한다(ready_backend: dict[str, Any]) -> None:
+    search_products_by_condition.invoke({"query": "마이너스통장 만들 수 있는 곳"})
+    assert ready_backend["search_kwargs"]["category"] == "개인신용대출"
 
 
 def test_추론할_단서가_없으면_기존대로_전체를_검색한다(ready_backend: dict[str, Any]) -> None:
     search_products_by_condition.invoke({"query": "청년만 가입할 수 있는 상품"})
     assert ready_backend["search_kwargs"]["category"] is None
-    assert ready_backend["search_kwargs"]["exclude_category"] == "개인신용대출"

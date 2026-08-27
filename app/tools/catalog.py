@@ -136,7 +136,6 @@ _SOURCES = (
 
 # 검색 필터 등에서 쓰는 카테고리 어휘의 단일 출처
 CATEGORIES: tuple[str, ...] = tuple(source.category for source in _SOURCES)
-CREDIT_CATEGORY = "개인신용대출"
 
 
 def _clean(value: Any) -> str:
