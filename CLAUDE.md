@@ -16,6 +16,8 @@
 
 ## Eval (LLM 동작)
 - 프롬프트나 그래프 구조를 바꾸면 `uv run python evals/run_evals.py`를 로컬에서 실행해 의도분류 정확도가 떨어지지 않았는지 확인한다. (CI에서는 API 비용 때문에 실행하지 않는다.)
+- 기준선은 `core` tier에만 건다. `boundary`는 표면 단서가 오도하는 문항 묶음이라 원래 낮게 나온다 — 이 수치를 올리려고 문항을 쉽게 바꾸지 않는다.
+- 골든셋 라벨은 **제품이 어떻게 답해야 하는가**로 정한다. 모델 출력을 보고 맞추면 eval이 자기 자신을 채점하게 된다. 규칙은 `evals/README.md`.
 
 ## 구조
 - 레이어 의존 방향: `api → agents → tools/db`, `batch → tools/db`. 역방향 import 금지.
