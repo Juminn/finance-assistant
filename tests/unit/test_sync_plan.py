@@ -1,4 +1,4 @@
-from app.batch.sync import plan_sync
+from app.batch.sync import is_mass_deletion, plan_sync
 from app.tools.catalog import ProductDoc
 
 
@@ -76,3 +76,17 @@ def test_수집되지_않은_카테고리의_키는_삭제하지_않는다() -> 
         },
     )
     assert plan.to_delete == ["deposit:GONE:9"]
+
+
+def test_소수_삭제는_정상으로_본다() -> None:
+    assert is_mass_deletion(5, existing_count=1000) is False
+
+
+def test_색인_대부분을_지우려_하면_대량삭제로_막는다() -> None:
+    # 한 권역 응답이 조용히 비어 오면 그 권역 상품이 통째로 삭제 대상이 된다.
+    assert is_mass_deletion(300, existing_count=1000) is True
+
+
+def test_삭제할_게_없으면_대량삭제가_아니다() -> None:
+    assert is_mass_deletion(0, existing_count=0) is False
+    assert is_mass_deletion(0, existing_count=1000) is False

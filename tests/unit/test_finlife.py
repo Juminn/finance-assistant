@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from app.tools.finlife import BANK, BASE_URL, FinlifeError, fetch_page
+from app.tools.finlife import BANK, BASE_URL, FinlifeError, fetch_all, fetch_page
 
 ENDPOINT = "depositProductsSearch.json"
 URL = f"{BASE_URL}/{ENDPOINT}"
@@ -62,3 +62,26 @@ def test_타임아웃이면_FinlifeError를_던진다() -> None:
     respx.get(URL).mock(side_effect=httpx.ConnectTimeout("연결 시간 초과"))
     with httpx.Client() as client, pytest.raises(FinlifeError):
         fetch_page(client, ENDPOINT, api_key="key", top_fin_grp_no=BANK)
+
+
+@respx.mock
+def test_같은_상품코드가_중복_공시돼도_두_건_모두_보존한다() -> None:
+    # 실제 사례: 아이엠뱅크가 '마이너스한도대출'과 '장기카드대출'을
+    # 같은 (fin_co_no, fin_prdt_cd)로 공시한다. dict 덮어쓰기로 유실되면 안 된다.
+    body = ok_result(
+        total_count=2,
+        baseList=[
+            {"fin_co_no": "0010016", "fin_prdt_cd": "WR0002F", "fin_prdt_nm": "마이너스한도대출"},
+            {"fin_co_no": "0010016", "fin_prdt_cd": "WR0002F", "fin_prdt_nm": "장기카드대출"},
+        ],
+    )
+    respx.get(URL).mock(return_value=httpx.Response(200, json=body))
+    with httpx.Client() as client:
+        bases, _ = fetch_all(client, ENDPOINT, api_key="key", top_fin_grp_no=BANK)
+
+    assert len(bases) == 2
+    names = {base["fin_prdt_nm"] for base in bases.values()}
+    assert names == {"마이너스한도대출", "장기카드대출"}
+    # 첫 건은 원래 코드를 유지하고, 중복분만 접미사로 구분한다
+    assert bases[("0010016", "WR0002F")]["fin_prdt_nm"] == "마이너스한도대출"
+    assert bases[("0010016", "WR0002F#2")]["fin_prdt_nm"] == "장기카드대출"

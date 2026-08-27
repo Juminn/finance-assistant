@@ -14,6 +14,18 @@ class SyncPlan:
     unchanged: int = 0
 
 
+# 한 권역 응답이 조용히 비어 오면 그 권역 상품 전체가 삭제 대상이 된다.
+# 정상적인 월 단위 변동폭을 크게 넘는 삭제는 사고로 보고 막는다.
+_MAX_DELETE_RATIO = 0.2
+
+
+def is_mass_deletion(delete_count: int, *, existing_count: int) -> bool:
+    """이번 삭제가 기존 색인 규모에 비해 비정상적으로 큰지."""
+    if delete_count == 0 or existing_count == 0:
+        return False
+    return delete_count > existing_count * _MAX_DELETE_RATIO
+
+
 def _slug(product_key: str) -> str:
     return product_key.split(":", 1)[0]
 

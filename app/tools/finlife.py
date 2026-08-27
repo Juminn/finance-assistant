@@ -8,7 +8,16 @@ BASE_URL = "https://finlife.fss.or.kr/finlifeapi"
 
 # 권역코드 (topFinGrpNo)
 BANK = "020000"  # 은행
+CREDIT_FINANCE = "030200"  # 여신전문금융
 SAVING_BANK = "030300"  # 저축은행
+INSURANCE = "050000"  # 보험
+SECURITIES = "060000"  # 금융투자
+
+# 카탈로그 색인이 훑는 전 권역
+ALL_GROUPS = (BANK, CREDIT_FINANCE, SAVING_BANK, INSURANCE, SECURITIES)
+
+# 같은 상품코드로 서로 다른 상품이 공시될 때 뒤엣것을 구분하는 접미사
+DUP_MARK = "#"
 
 # 상품 엔드포인트 — 도구·카탈로그가 공유하는 단일 정의
 DEPOSIT_ENDPOINT = "depositProductsSearch.json"
@@ -18,6 +27,11 @@ RENT_ENDPOINT = "rentHouseLoanProductsSearch.json"
 CREDIT_ENDPOINT = "creditLoanProductsSearch.json"
 
 _OK = "000"
+
+
+def base_product_code(product_code: str) -> str:
+    """중복 공시 접미사를 뗀 원래 상품코드. 옵션 목록과 조인할 때 쓴다."""
+    return product_code.split(DUP_MARK, 1)[0]
 
 
 def to_float(value: object) -> float | None:
@@ -85,7 +99,16 @@ def fetch_all(
             client, endpoint, api_key=api_key, top_fin_grp_no=top_fin_grp_no, page_no=page_no
         )
         for base in result.get("baseList", []):
-            bases[(base["fin_co_no"], base["fin_prdt_cd"])] = base
+            # 같은 (회사, 상품코드)로 서로 다른 상품이 공시되는 경우가 있다.
+            # 그대로 덮어쓰면 상품이 조용히 사라지므로 접미사를 붙여 둘 다 남긴다.
+            key = (base["fin_co_no"], base["fin_prdt_cd"])
+            duplicate = 2
+            while key in bases:
+                if bases[key] == base:
+                    break  # 페이지가 겹쳐 같은 행이 다시 온 것 — 새 키를 만들지 않는다
+                key = (base["fin_co_no"], f"{base['fin_prdt_cd']}{DUP_MARK}{duplicate}")
+                duplicate += 1
+            bases[key] = base
         options.extend(result.get("optionList", []))
         if page_no >= int(result.get("max_page_no") or 1):
             break
