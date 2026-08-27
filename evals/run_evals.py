@@ -3,6 +3,10 @@
 실행: uv run python evals/run_evals.py
 프롬프트나 그래프 구조를 바꾸면 반드시 로컬에서 실행해 정확도 회귀를 확인한다.
 (실제 LLM을 호출하므로 CI에서는 돌리지 않는다.)
+
+라벨링 규칙과 tier의 의미는 evals/README.md 참고.
+기준선은 core tier에만 건다 — boundary는 원래 낮게 나오는 문항 묶음이라
+함께 평균 내면 회귀가 묻힌다.
 """
 
 import json
@@ -11,14 +15,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-THRESHOLD = 0.9
+CORE_THRESHOLD = 0.9
 _GOLDEN_PATH = Path(__file__).parent / "golden.jsonl"
+_INTENTS = ("deposit", "loan", "general")
 
 
 @dataclass
 class EvalRecord:
     question: str
     intent: str
+    tier: str = "core"
 
 
 @dataclass
@@ -26,17 +32,58 @@ class WrongAnswer:
     question: str
     expected: str
     actual: str
+    tier: str = "core"
+
+
+@dataclass
+class Outcome:
+    record: EvalRecord
+    actual: str
+
+    @property
+    def is_correct(self) -> bool:
+        return self.actual == self.record.intent
 
 
 @dataclass
 class EvalReport:
-    total: int
-    correct: int
-    wrong: list[WrongAnswer] = field(default_factory=list[WrongAnswer])
+    outcomes: list[Outcome] = field(default_factory=list[Outcome])
+
+    @property
+    def total(self) -> int:
+        return len(self.outcomes)
+
+    @property
+    def correct(self) -> int:
+        return sum(1 for o in self.outcomes if o.is_correct)
 
     @property
     def accuracy(self) -> float:
         return self.correct / self.total if self.total else 0.0
+
+    @property
+    def wrong(self) -> list[WrongAnswer]:
+        return [
+            WrongAnswer(
+                question=o.record.question,
+                expected=o.record.intent,
+                actual=o.actual,
+                tier=o.record.tier,
+            )
+            for o in self.outcomes
+            if not o.is_correct
+        ]
+
+    def subset(self, *, tier: str | None = None, intent: str | None = None) -> "EvalReport":
+        """tier·정답라벨로 잘라낸 부분 리포트."""
+        return EvalReport(
+            [
+                o
+                for o in self.outcomes
+                if (tier is None or o.record.tier == tier)
+                and (intent is None or o.record.intent == intent)
+            ]
+        )
 
 
 def load_golden(path: Path = _GOLDEN_PATH) -> list[EvalRecord]:
@@ -45,21 +92,18 @@ def load_golden(path: Path = _GOLDEN_PATH) -> list[EvalRecord]:
         if not line.strip():
             continue
         row = json.loads(line)
-        records.append(EvalRecord(question=row["question"], intent=row["intent"]))
+        records.append(
+            EvalRecord(
+                question=row["question"],
+                intent=row["intent"],
+                tier=row.get("tier", "core"),
+            )
+        )
     return records
 
 
 def evaluate(records: list[EvalRecord], classify: Callable[[EvalRecord], str]) -> EvalReport:
-    report = EvalReport(total=len(records), correct=0)
-    for record in records:
-        actual = classify(record)
-        if actual == record.intent:
-            report.correct += 1
-        else:
-            report.wrong.append(
-                WrongAnswer(question=record.question, expected=record.intent, actual=actual)
-            )
-    return report
+    return EvalReport([Outcome(record=r, actual=classify(r)) for r in records])
 
 
 def _classify_with_llm(record: EvalRecord) -> str:
@@ -69,6 +113,22 @@ def _classify_with_llm(record: EvalRecord) -> str:
 
     update = supervisor({"messages": [HumanMessage(record.question)], "intent": "general"})
     return str(update["intent"])
+
+
+def _print_breakdown(report: EvalReport) -> None:
+    print(f"\n전체 정확도: {report.accuracy:.1%} ({report.correct}/{report.total})")
+
+    print("\n  tier별")
+    for tier in ("core", "boundary"):
+        part = report.subset(tier=tier)
+        if part.total:
+            print(f"    {tier:9s} {part.accuracy:6.1%} ({part.correct}/{part.total})")
+
+    print("\n  정답 라벨별 (core)")
+    for intent in _INTENTS:
+        part = report.subset(tier="core", intent=intent)
+        if part.total:
+            print(f"    {intent:9s} {part.accuracy:6.1%} ({part.correct}/{part.total})")
 
 
 def main() -> int:
@@ -81,15 +141,18 @@ def main() -> int:
     records = load_golden()
     print(f"골든셋 {len(records)}건 평가 중...")
     report = evaluate(records, classify=_classify_with_llm)
+    _print_breakdown(report)
 
-    print(f"\n의도분류 정확도: {report.accuracy:.1%} ({report.correct}/{report.total})")
-    for wrong in report.wrong:
-        print(f"  [오답] {wrong.question!r}: 예상 {wrong.expected} → 실제 {wrong.actual}")
+    if report.wrong:
+        print("\n오답")
+        for w in sorted(report.wrong, key=lambda x: x.tier):
+            print(f"  [{w.tier}] {w.question!r}: 예상 {w.expected} → 실제 {w.actual}")
 
-    if report.accuracy < THRESHOLD:
-        print(f"\n기준({THRESHOLD:.0%}) 미달 — 프롬프트 회귀를 확인하세요.")
+    core = report.subset(tier="core")
+    if core.accuracy < CORE_THRESHOLD:
+        print(f"\ncore 기준({CORE_THRESHOLD:.0%}) 미달 — 프롬프트 회귀를 확인하세요.")
         return 1
-    print("\n기준 통과.")
+    print(f"\ncore 기준({CORE_THRESHOLD:.0%}) 통과.")
     return 0
 
 

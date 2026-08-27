@@ -1,24 +1,89 @@
-{"question": "1년 정기예금 금리 비교해줘", "intent": "deposit"}
-{"question": "적금 뭐가 좋아?", "intent": "deposit"}
-{"question": "목돈 5천만원 어디에 맡기는 게 좋을까", "intent": "deposit"}
-{"question": "6개월 단기로 넣을 예금 추천해줘", "intent": "deposit"}
-{"question": "저축은행 예금 금리 알려줘", "intent": "deposit"}
-{"question": "정기예금이랑 적금 중에 뭐가 나아?", "intent": "deposit"}
-{"question": "금리 제일 높은 예금이 뭐야", "intent": "deposit"}
-{"question": "천만원을 1년 넣으면 이자 얼마나 받아?", "intent": "deposit"}
-{"question": "주택담보대출 금리 비교해줘", "intent": "loan"}
-{"question": "전세자금대출 알아보고 있어", "intent": "loan"}
-{"question": "신용대출 한도가 궁금해", "intent": "loan"}
-{"question": "대출 갈아타기 하고 싶은데", "intent": "loan"}
-{"question": "버팀목 전세대출 조건이 뭐야", "intent": "loan"}
-{"question": "마이너스통장 금리 어때?", "intent": "loan"}
-{"question": "집 살 때 돈 빌리려면 어떻게 해?", "intent": "loan"}
-{"question": "안녕", "intent": "general"}
-{"question": "고마워!", "intent": "general"}
-{"question": "예금자보호가 뭐야?", "intent": "general"}
-{"question": "기준금리가 오르면 어떻게 돼?", "intent": "general"}
-{"question": "복리가 뭔지 설명해줘", "intent": "general"}
-{"question": "코스피가 뭐야", "intent": "general"}
-{"question": "너는 뭘 할 수 있어?", "intent": "general"}
-{"question": "환율은 왜 오르는 거야", "intent": "general"}
-{"question": "ISA 계좌가 뭔가요", "intent": "general"}
+{"question": "1년 정기예금 금리 비교해줘", "intent": "deposit", "tier": "core"}
+{"question": "적금 뭐가 좋아?", "intent": "deposit", "tier": "core"}
+{"question": "목돈 5천만원 어디에 맡기는 게 좋을까", "intent": "deposit", "tier": "core"}
+{"question": "6개월 단기로 넣을 예금 추천해줘", "intent": "deposit", "tier": "core"}
+{"question": "저축은행 예금 금리 알려줘", "intent": "deposit", "tier": "core"}
+{"question": "정기예금이랑 적금 중에 뭐가 나아?", "intent": "deposit", "tier": "core"}
+{"question": "금리 제일 높은 예금이 뭐야", "intent": "deposit", "tier": "core"}
+{"question": "천만원을 1년 넣으면 이자 얼마나 받아?", "intent": "deposit", "tier": "core"}
+{"question": "3년 만기 적금 추천해줘", "intent": "deposit", "tier": "core"}
+{"question": "매달 50만원씩 넣을 적금 알려줘", "intent": "deposit", "tier": "core"}
+{"question": "우대금리 조건 좋은 정기예금 찾아줘", "intent": "deposit", "tier": "core"}
+{"question": "자유적립식 적금 중에 금리 높은 거 보여줘", "intent": "deposit", "tier": "core"}
+{"question": "인터넷으로 가입할 수 있는 예금 있어?", "intent": "deposit", "tier": "core"}
+{"question": "급여이체하면 금리 더 주는 적금 있나", "intent": "deposit", "tier": "core"}
+{"question": "카카오뱅크 예금 금리 어때", "intent": "deposit", "tier": "core"}
+{"question": "청년 우대 적금 있어?", "intent": "deposit", "tier": "core"}
+{"question": "2년짜리 예금 금리 순위 보여줘", "intent": "deposit", "tier": "core"}
+{"question": "만기 후 이자율 높은 예금이 뭐야", "intent": "deposit", "tier": "core"}
+{"question": "비대면으로 가입되는 정기예금 알려줘", "intent": "deposit", "tier": "core"}
+{"question": "결혼자금 2년 동안 모을 상품 찾아줘", "intent": "deposit", "tier": "core"}
+{"question": "주택담보대출 금리 비교해줘", "intent": "loan", "tier": "core"}
+{"question": "전세자금대출 알아보고 있어", "intent": "loan", "tier": "core"}
+{"question": "신용대출 한도가 궁금해", "intent": "loan", "tier": "core"}
+{"question": "대출 갈아타기 하고 싶은데", "intent": "loan", "tier": "core"}
+{"question": "버팀목 전세대출 조건이 뭐야", "intent": "loan", "tier": "core"}
+{"question": "마이너스통장 금리 어때?", "intent": "loan", "tier": "core"}
+{"question": "집 살 때 돈 빌리려면 어떻게 해?", "intent": "loan", "tier": "core"}
+{"question": "아파트 담보로 대출 얼마나 나와?", "intent": "loan", "tier": "core"}
+{"question": "전세보증금 대출 금리 낮은 곳 알려줘", "intent": "loan", "tier": "core"}
+{"question": "중도상환수수료 없는 대출 있어?", "intent": "loan", "tier": "core"}
+{"question": "고정금리 주택담보대출 추천해줘", "intent": "loan", "tier": "core"}
+{"question": "신용점수 900점인데 금리 얼마나 받을 수 있어?", "intent": "loan", "tier": "core"}
+{"question": "분할상환으로 갚는 주담대 알려줘", "intent": "loan", "tier": "core"}
+{"question": "카드론 금리 비교해줘", "intent": "loan", "tier": "core"}
+{"question": "저축은행 신용대출도 볼 수 있어?", "intent": "loan", "tier": "core"}
+{"question": "연체이자율 낮은 대출이 뭐야", "intent": "loan", "tier": "core"}
+{"question": "대출 한도 많이 나오는 곳 알려줘", "intent": "loan", "tier": "core"}
+{"question": "전세 재계약하는데 보증금이 모자라", "intent": "loan", "tier": "core"}
+{"question": "영업점 안 가고 받을 수 있는 신용대출 있어?", "intent": "loan", "tier": "core"}
+{"question": "생활안정자금 목적 주담대 금리 알려줘", "intent": "loan", "tier": "core"}
+{"question": "안녕", "intent": "general", "tier": "core"}
+{"question": "고마워!", "intent": "general", "tier": "core"}
+{"question": "예금자보호가 뭐야?", "intent": "general", "tier": "core"}
+{"question": "기준금리가 오르면 어떻게 돼?", "intent": "general", "tier": "core"}
+{"question": "복리가 뭔지 설명해줘", "intent": "general", "tier": "core"}
+{"question": "코스피가 뭐야", "intent": "general", "tier": "core"}
+{"question": "너는 뭘 할 수 있어?", "intent": "general", "tier": "core"}
+{"question": "환율은 왜 오르는 거야", "intent": "general", "tier": "core"}
+{"question": "ISA 계좌가 뭔가요", "intent": "general", "tier": "core"}
+{"question": "단리랑 복리 차이가 뭐야", "intent": "general", "tier": "core"}
+{"question": "인플레이션이 뭐야", "intent": "general", "tier": "core"}
+{"question": "넌 누구야?", "intent": "general", "tier": "core"}
+{"question": "오늘 날씨 어때", "intent": "general", "tier": "core"}
+{"question": "이자소득세는 몇 퍼센트야?", "intent": "general", "tier": "core"}
+{"question": "신용점수 올리는 방법 알려줘", "intent": "general", "tier": "core"}
+{"question": "연말정산은 어떻게 하는 거야", "intent": "general", "tier": "core"}
+{"question": "경기 침체가 오면 금리는 어떻게 돼?", "intent": "general", "tier": "core"}
+{"question": "금융감독원은 무슨 일을 하는 곳이야", "intent": "general", "tier": "core"}
+{"question": "도와줘서 고마워, 잘 쓸게", "intent": "general", "tier": "core"}
+{"question": "돈 모으고 싶어", "intent": "deposit", "tier": "boundary"}
+{"question": "월급 받으면 어디에 넣어둘까", "intent": "deposit", "tier": "boundary"}
+{"question": "여윳돈 3천만원 놀리기 아까운데", "intent": "deposit", "tier": "boundary"}
+{"question": "예금자보호 한도까지만 넣고 싶은데 어디가 좋아?", "intent": "deposit", "tier": "boundary"}
+{"question": "은행보다 금리 더 주는 데 없어?", "intent": "deposit", "tier": "boundary"}
+{"question": "1억 만들려면 뭐부터 해야 해?", "intent": "deposit", "tier": "boundary"}
+{"question": "만기까지 못 채울 것 같은데 그래도 괜찮은 상품 있어?", "intent": "deposit", "tier": "boundary"}
+{"question": "이자 조금이라도 더 받고 싶어", "intent": "deposit", "tier": "boundary"}
+{"question": "집 사고 싶은데 돈이 부족해", "intent": "loan", "tier": "boundary"}
+{"question": "전세 만기인데 집주인이 보증금 올려달래", "intent": "loan", "tier": "boundary"}
+{"question": "당장 500만원이 급하게 필요해", "intent": "loan", "tier": "boundary"}
+{"question": "이자 부담을 줄이고 싶어, 지금 4프로 내고 있어", "intent": "loan", "tier": "boundary"}
+{"question": "빌린 돈 미리 갚으면 손해야?", "intent": "loan", "tier": "boundary"}
+{"question": "KCB랑 NICE 중에 어디 점수 보는 데가 유리해?", "intent": "loan", "tier": "boundary"}
+{"question": "월세 살다가 전세로 옮기려는데", "intent": "loan", "tier": "boundary"}
+{"question": "한도가 얼마나 나오는지 미리 알 수 있어?", "intent": "loan", "tier": "boundary"}
+{"question": "청약통장 금리 얼마야?", "intent": "general", "tier": "boundary"}
+{"question": "연금저축 어디가 좋아?", "intent": "general", "tier": "boundary"}
+{"question": "펀드랑 예금 중에 뭐가 나아?", "intent": "general", "tier": "boundary"}
+{"question": "DSR이 뭐야", "intent": "general", "tier": "boundary"}
+{"question": "LTV 70%면 3억짜리 집에 얼마 나오는 거야?", "intent": "general", "tier": "boundary"}
+{"question": "적금 중도해지하면 이자 어떻게 계산돼?", "intent": "general", "tier": "boundary"}
+{"question": "예금자보호 한도를 넘으면 어떻게 되는 거야?", "intent": "general", "tier": "boundary"}
+{"question": "적금 이자에서 세금 얼마나 떼가?", "intent": "general", "tier": "boundary"}
+{"question": "주식 뭐 사면 좋아?", "intent": "general", "tier": "boundary"}
+{"question": "비트코인 지금 사도 될까?", "intent": "general", "tier": "boundary"}
+{"question": "자동차보험 싼 데 알려줘", "intent": "general", "tier": "boundary"}
+{"question": "변동금리랑 고정금리 차이가 뭐야", "intent": "general", "tier": "boundary"}
+{"question": "신용카드 할부 수수료는 어떻게 계산해?", "intent": "general", "tier": "boundary"}
+{"question": "은행이 망하면 내 돈은 어떻게 돼?", "intent": "general", "tier": "boundary"}
