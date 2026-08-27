@@ -22,7 +22,7 @@ cp .env.example .env
 uv run python -m app.batch.sync_catalog
 
 # 4. 서버 실행 후 http://localhost:8000 접속
-uv run uvicorn app.api.main:app --reload
+uv run uvicorn app.api.main:app --reload --reload-dir app --reload-dir web
 ```
 
 `DATABASE_URL`에는 [Neon](https://neon.com)의 무료 PostgreSQL 연결 문자열을 넣습니다

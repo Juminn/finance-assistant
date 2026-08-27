@@ -36,5 +36,5 @@
 - 테스트: `uv run pytest` (integration 포함 실행: `uv run pytest -m integration`)
 - 린트/포맷: `uv run ruff check --fix .` / `uv run ruff format .`
 - 타입체크: `uv run pyright`
-- 서버 실행: `uv run uvicorn app.api.main:app --reload`
+- 서버 실행: `uv run uvicorn app.api.main:app --reload --reload-dir app --reload-dir web`
 - 상품 색인 배치: `uv run python -m app.batch.sync_catalog`
