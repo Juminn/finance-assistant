@@ -1,5 +1,8 @@
 """금융감독원 금융상품통합비교공시 오픈API 공용 클라이언트."""
 
+import json
+from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import httpx
@@ -114,3 +117,45 @@ def fetch_all(
             break
         page_no += 1
     return bases, options
+
+
+def fetch_all_groups(
+    client: httpx.Client,
+    endpoint: str,
+    *,
+    api_key: str,
+    groups: Sequence[str] = ALL_GROUPS,
+) -> tuple[dict[tuple[str, str], dict[str, Any]], list[dict[str, Any]]]:
+    """여러 권역을 훑어 (상품 기본정보 맵, 옵션 목록)을 합쳐 반환한다.
+
+    금융회사코드(fin_co_no)는 권역 간 고유하므로 기본정보 맵은 그대로 합쳐진다.
+    옵션은 완전히 동일한 행이 두 번 담기지 않도록 걸러, 같은 상품이 중복
+    계상되는 것을 막는다.
+    """
+    merged_bases: dict[tuple[str, str], dict[str, Any]] = {}
+    merged_options: list[dict[str, Any]] = []
+    seen_options: set[str] = set()
+
+    # 권역은 서로 독립이라 동시에 훑는다. 순차로 돌면 권역 수만큼 응답이 느려진다.
+    # 결과는 groups 순서대로 합쳐 호출마다 같은 순서가 나오게 한다.
+    def fetch_group(
+        group: str,
+    ) -> tuple[dict[tuple[str, str], dict[str, Any]], list[dict[str, Any]]]:
+        return fetch_all(client, endpoint, api_key=api_key, top_fin_grp_no=group)
+
+    if len(groups) == 1:
+        fetched = [fetch_group(groups[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=len(groups)) as pool:
+            fetched = list(pool.map(fetch_group, groups))
+
+    for bases, options in fetched:
+        merged_bases.update(bases)
+        for option in options:
+            fingerprint = json.dumps(option, sort_keys=True, ensure_ascii=False, default=str)
+            if fingerprint in seen_options:
+                continue
+            seen_options.add(fingerprint)
+            merged_options.append(option)
+
+    return merged_bases, merged_options
