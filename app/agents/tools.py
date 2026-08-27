@@ -14,7 +14,7 @@ from app.core.embeddings import embed_texts
 from app.db.session import get_session_factory, vector_search_enabled
 from app.db.vector_repo import index_ready, search_similar
 from app.tools.catalog import CATEGORIES, CREDIT_CATEGORY
-from app.tools.condition import format_matches
+from app.tools.condition import format_matches, infer_category
 from app.tools.deposit import format_deposit_products, search_deposit_products
 from app.tools.finlife import FinlifeError
 from app.tools.loan import (
@@ -150,6 +150,11 @@ def search_products_by_condition(query: str, category: str = "") -> str:
     if category not in CATEGORIES:
         category = ""
 
+    # 카테고리를 안 주면 질의문에서 추론한다. 색인이 커질수록 전체 검색은
+    # 무관 카테고리에 상위를 빼앗기므로, 단서가 있으면 좁히는 편이 정확하다.
+    inferred_category = infer_category(query) if not category else ""
+    category = category or inferred_category
+
     # 개인신용대출 정보는 비교 도구와 동일하게 로그인 사용자에게만 제공한다
     exclude_category = None
     if not is_authenticated():
@@ -177,4 +182,6 @@ def search_products_by_condition(query: str, category: str = "") -> str:
     note = ""
     if requested_category and requested_category not in CATEGORIES:
         note = f"[참고] '{requested_category}' 카테고리를 인식하지 못해 전체에서 검색했습니다.\n"
+    elif inferred_category:
+        note = f"[참고] 질의를 보고 '{inferred_category}' 카테고리로 좁혀 검색했습니다.\n"
     return note + format_matches(matches)
