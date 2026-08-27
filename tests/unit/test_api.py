@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -7,21 +8,18 @@ from langchain_core.messages import AIMessage
 
 import app.api.chat as chat_module
 from app.api.main import create_app
-from app.core.auth_context import is_authenticated
 from app.db.base import make_engine
 
 
 class FakeAgent:
-    """항상 정해진 답을 돌려주는 가짜 그래프. 호출 시점의 인증 컨텍스트도 기록한다."""
+    """항상 정해진 답을 돌려주는 가짜 그래프."""
 
     def __init__(self, reply: str) -> None:
         self.reply = reply
         self.calls: list[dict[str, Any]] = []
 
     def invoke(self, payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-        self.calls.append(
-            {"payload": payload, "config": config, "authenticated": is_authenticated()}
-        )
+        self.calls.append({"payload": payload, "config": config})
         return {"messages": [AIMessage(content=self.reply)]}
 
 
@@ -42,15 +40,11 @@ def client(fake_agent: FakeAgent) -> Iterator[TestClient]:
     session_module.set_engine(None)
 
 
-def test_데모_계정으로_로그인하면_토큰을_받는다(client: TestClient) -> None:
+def test_로그인_엔드포인트는_더_이상_없다(client: TestClient) -> None:
     response = client.post("/api/auth/login", json={"username": "demo", "password": "demo1234!"})
-    assert response.status_code == 200
-    assert len(response.json()["token"]) >= 32
-
-
-def test_틀린_비밀번호는_401(client: TestClient) -> None:
-    response = client.post("/api/auth/login", json={"username": "demo", "password": "nope"})
-    assert response.status_code == 401
+    # 라우트가 사라져 정적 마운트(/)가 요청을 받는다 — GET 전용이라 405
+    assert response.status_code == 405
+    assert "token" not in response.text
 
 
 def test_챗_요청은_답변과_세션id를_반환한다(client: TestClient, fake_agent: FakeAgent) -> None:
@@ -68,68 +62,17 @@ def test_챗_요청은_답변과_세션id를_반환한다(client: TestClient, fa
     assert thread_ids[0] == thread_ids[1]
 
 
+def test_세션이_다르면_스레드도_다르다(client: TestClient, fake_agent: FakeAgent) -> None:
+    client.post("/api/chat", json={"message": "안녕"})
+    client.post("/api/chat", json={"message": "안녕"})
+    threads = [c["config"]["configurable"]["thread_id"] for c in fake_agent.calls]
+    assert threads[0] != threads[1]
+
+
 def test_답변의_개인정보는_마스킹되어_나간다(client: TestClient, fake_agent: FakeAgent) -> None:
     fake_agent.reply = "고객님 번호 900101-1234567 확인했습니다"
     response = client.post("/api/chat", json={"message": "내 정보 알려줘"})
     assert "900101-1234567" not in response.json()["reply"]
-
-
-def test_비로그인_요청은_비인증_컨텍스트로_실행된다(
-    client: TestClient, fake_agent: FakeAgent
-) -> None:
-    client.post("/api/chat", json={"message": "신용대출 금리"})
-    assert fake_agent.calls[-1]["authenticated"] is False
-
-
-def test_로그인한_요청은_인증_컨텍스트로_실행된다(
-    client: TestClient, fake_agent: FakeAgent
-) -> None:
-    token = client.post(
-        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
-    ).json()["token"]
-    client.post(
-        "/api/chat",
-        json={"message": "신용대출 금리"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert fake_agent.calls[-1]["authenticated"] is True
-
-
-def test_같은_세션이라도_인증_여부가_다르면_스레드가_분리된다(
-    client: TestClient, fake_agent: FakeAgent
-) -> None:
-    session_id = client.post("/api/chat", json={"message": "안녕"}).json()["session_id"]
-    token = client.post(
-        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
-    ).json()["token"]
-    client.post(
-        "/api/chat",
-        json={"message": "신용대출 알려줘", "session_id": session_id},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    anon_thread = fake_agent.calls[0]["config"]["configurable"]["thread_id"]
-    auth_thread = fake_agent.calls[1]["config"]["configurable"]["thread_id"]
-    assert anon_thread != auth_thread
-
-
-def test_로그인_사용자의_대화_이력은_본인만_조회할_수_있다(
-    client: TestClient, fake_agent: FakeAgent
-) -> None:
-    token = client.post(
-        "/api/auth/login", json={"username": "demo", "password": "demo1234!"}
-    ).json()["token"]
-    session_id = client.post(
-        "/api/chat",
-        json={"message": "신용대출 알려줘"},
-        headers={"Authorization": f"Bearer {token}"},
-    ).json()["session_id"]
-
-    anonymous = client.get(f"/api/history/{session_id}")
-    assert anonymous.status_code == 403
-
-    owner = client.get(f"/api/history/{session_id}", headers={"Authorization": f"Bearer {token}"})
-    assert owner.status_code == 200
-    assert len(owner.json()["messages"]) == 2
 
 
 def test_에이전트가_실패하면_502와_안내_메시지를_준다(
@@ -142,6 +85,25 @@ def test_에이전트가_실패하면_502와_안내_메시지를_준다(
     response = client.post("/api/chat", json={"message": "안녕"})
     assert response.status_code == 502
     assert "오류" in response.json()["detail"]
+
+
+def test_실패_로그에_세션id_전문이_남지_않는다(
+    client: TestClient,
+    fake_agent: FakeAgent,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # 로그인을 없앤 뒤로 session_id가 대화를 여는 유일한 비밀이다.
+    # 로그를 보는 사람이 남의 대화를 열 수 있으면 안 된다.
+    def boom(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("LLM down")
+
+    monkeypatch.setattr(fake_agent, "invoke", boom)
+    session_id = "0123456789abcdef0123456789abcdef"
+    with caplog.at_level(logging.ERROR):
+        client.post("/api/chat", json={"message": "안녕", "session_id": session_id})
+
+    assert session_id not in caplog.text
 
 
 def test_대화_이력을_세션별로_조회한다(client: TestClient) -> None:

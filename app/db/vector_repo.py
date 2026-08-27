@@ -79,14 +79,11 @@ def search_similar(
     *,
     top_k: int = 5,
     category: str | None = None,
-    exclude_category: str | None = None,
 ) -> list[tuple[ProductEmbedding, float]]:
     """질의 벡터와 코사인 거리가 가까운 상품을 반환한다. (거리가 작을수록 유사)"""
     distance = ProductEmbedding.embedding.cosine_distance(query_vector)
     statement = select(ProductEmbedding, distance.label("distance"))
     if category:
         statement = statement.where(ProductEmbedding.category == category)
-    if exclude_category:
-        statement = statement.where(ProductEmbedding.category != exclude_category)
     statement = statement.order_by(distance).limit(top_k)
     return [(row[0], float(row[1])) for row in db.execute(statement)]

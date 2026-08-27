@@ -1,4 +1,4 @@
-"""에이전트 도구 바인딩의 권한 게이트 검증."""
+"""에이전트 도구 바인딩 검증."""
 
 from typing import Any
 
@@ -8,7 +8,6 @@ import respx
 from pydantic_settings import SettingsConfigDict
 
 from app.agents.tools import compare_credit_loans
-from app.core.auth_context import authenticated_request, is_authenticated
 from app.core.config import Settings
 from app.tools.finlife import BASE_URL
 
@@ -26,26 +25,8 @@ def keyed_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_기본값은_비인증_상태다() -> None:
-    assert is_authenticated() is False
-
-
-def test_컨텍스트_안에서만_인증_상태가_된다() -> None:
-    with authenticated_request(True):
-        assert is_authenticated() is True
-    assert is_authenticated() is False
-
-
 @respx.mock
-def test_비로그인이면_신용대출_도구는_로그인_안내만_반환한다(keyed_settings: None) -> None:
-    route = respx.get(CREDIT_URL).mock(return_value=httpx.Response(500))
-    result = compare_credit_loans.invoke({})
-    assert "로그인" in result
-    assert not route.called
-
-
-@respx.mock
-def test_로그인_상태면_신용대출을_조회한다(keyed_settings: None) -> None:
+def test_신용대출_도구는_인증_없이도_결과를_반환한다(keyed_settings: None) -> None:
     payload: dict[str, Any] = {
         "result": {
             "err_cd": "000",
@@ -76,8 +57,7 @@ def test_로그인_상태면_신용대출을_조회한다(keyed_settings: None) 
     }
     respx.get(CREDIT_URL).mock(return_value=httpx.Response(200, json=payload))
 
-    with authenticated_request(True):
-        result = compare_credit_loans.invoke({})
+    result = compare_credit_loans.invoke({})
 
     assert "가은행" in result
     assert "5.50" in result

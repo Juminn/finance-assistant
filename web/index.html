@@ -20,7 +20,6 @@
     padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--line);
   }
   header h1 { font-size: 17px; }
-  header .auth { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   header input {
     width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
   }
@@ -54,7 +53,6 @@
 <body>
   <header>
     <h1>💬 금융 통합 비서</h1>
-    <div class="auth" id="auth"></div>
   </header>
 
   <div id="messages">
@@ -72,45 +70,8 @@
   const messagesEl = document.getElementById("messages");
   const form = document.getElementById("chat-form");
   const input = document.getElementById("chat-input");
-  const authEl = document.getElementById("auth");
 
   let sessionId = sessionStorage.getItem("session_id") || null;
-
-  function token() { try { return localStorage.getItem("token"); } catch { return null; } }
-  function username() { try { return localStorage.getItem("username"); } catch { return null; } }
-
-  function renderAuth() {
-    if (token()) {
-      authEl.innerHTML = `<span>${username()}님</span><button class="ghost" id="logout">로그아웃</button>`;
-      document.getElementById("logout").onclick = () => {
-        try { localStorage.removeItem("token"); localStorage.removeItem("username"); } catch {}
-        renderAuth();
-      };
-    } else {
-      authEl.innerHTML = `
-        <input id="login-id" placeholder="아이디 (demo)" />
-        <input id="login-pw" type="password" placeholder="비밀번호" />
-        <button id="login-btn">로그인</button>`;
-      document.getElementById("login-btn").onclick = login;
-    }
-  }
-
-  async function login() {
-    const usernameInput = document.getElementById("login-id").value || "demo";
-    const passwordInput = document.getElementById("login-pw").value;
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: usernameInput, password: passwordInput }),
-    });
-    if (!res.ok) { addMessage("hint", "로그인에 실패했어요. 아이디/비밀번호를 확인해주세요."); return; }
-    const data = await res.json();
-    try {
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("username", data.username);
-    } catch {}
-    renderAuth();
-  }
 
   function addMessage(role, text) {
     const div = document.createElement("div");
@@ -129,11 +90,9 @@
     addMessage("user", text);
     const thinking = addMessage("assistant", "생각 중…");
     try {
-      const headers = { "Content-Type": "application/json" };
-      if (token()) headers["Authorization"] = `Bearer ${token()}`;
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, session_id: sessionId }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -146,7 +105,6 @@
     }
   });
 
-  renderAuth();
   input.focus();
 </script>
 </body>

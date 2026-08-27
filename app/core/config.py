@@ -17,8 +17,6 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
     database_url: str = _DEFAULT_DATABASE_URL
-    demo_username: str = "demo"
-    demo_password: str = "demo1234!"
 
     @field_validator("database_url")
     @classmethod
