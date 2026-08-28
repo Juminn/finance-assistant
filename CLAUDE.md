@@ -10,7 +10,7 @@
 조건 검색 도구는 스스로 비활성 안내를 반환하고, 나머지 기능은 SQLite로 동작한다.
 
 ## TDD (결정적 코드)
-- `app/tools`, `app/db`, `app/api`와 라우팅·파싱·권한 로직은 **실패하는 테스트를 먼저** 작성한 뒤 구현한다 (red → green → refactor).
+- `app/tools`, `app/db`, `app/api`와 라우팅·파싱 로직은 **실패하는 테스트를 먼저** 작성한 뒤 구현한다 (red → green → refactor).
 - 테스트 없는 결정적 코드는 커밋하지 않는다.
 - 외부 HTTP는 respx로 mock한다. 실 API 호출 테스트는 `@pytest.mark.integration`으로 표시한다 (기본 실행과 CI에서 제외됨).
 
