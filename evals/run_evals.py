@@ -13,10 +13,13 @@
 """
 
 import json
+import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 CORE_THRESHOLD = 0.9
 _GOLDEN_PATH = Path(__file__).parent / "golden.jsonl"
@@ -134,18 +137,22 @@ def _print_breakdown(report: EvalReport) -> None:
             print(f"    {intent:9s} {part.accuracy:6.1%} ({part.correct}/{part.total})")
 
 
-def main() -> int:
-    from app.core.config import get_settings
-
-    if "--trace" in sys.argv[1:]:
-        import os
-
-        from dotenv import load_dotenv
-
-        # 이 실행만 트레이싱한다 — .env의 LANGSMITH_TRACING 값과 무관하게 켜고,
+def configure_tracing(argv: list[str]) -> bool:
+    """--trace면 이 실행만 트레이싱을 켜고, 아니면 셸·IDE가 올려둔 값이 있어도 끈다."""
+    if "--trace" in argv:
+        # .env의 LANGSMITH_TRACING 값과 무관하게 켜고,
         # API 키 등 나머지 LANGSMITH_*는 .env에서 프로세스 환경으로 올린다
         os.environ["LANGSMITH_TRACING"] = "true"
         load_dotenv()
+        return True
+    os.environ["LANGSMITH_TRACING"] = "false"
+    return False
+
+
+def main() -> int:
+    from app.core.config import get_settings
+
+    configure_tracing(sys.argv[1:])
 
     if not get_settings().openai_api_key:
         print("OPENAI_API_KEY가 .env에 없어 eval을 실행할 수 없습니다.")

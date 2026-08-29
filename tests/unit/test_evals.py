@@ -1,4 +1,9 @@
-from evals.run_evals import EvalRecord, evaluate, load_golden
+import os
+
+import pytest
+
+import evals.run_evals as run_evals
+from evals.run_evals import EvalRecord, configure_tracing, evaluate, load_golden
 
 
 def test_골든셋_파일을_로드한다() -> None:
@@ -61,3 +66,20 @@ def test_비어있는_부분집합의_정확도는_0이다() -> None:
     report = evaluate([EvalRecord("안녕", "general")], classify=lambda r: r.intent)
     assert report.subset(tier="boundary").total == 0
     assert report.subset(tier="boundary").accuracy == 0.0
+
+
+def test_trace_플래그가_없으면_셸에_트레이싱이_켜져_있어도_끈다(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LANGSMITH_TRACING", "true")
+    assert configure_tracing([]) is False
+    assert os.environ["LANGSMITH_TRACING"] == "false"
+
+
+def test_trace_플래그가_있으면_이_실행만_트레이싱을_켠다(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
+    monkeypatch.setattr(run_evals, "load_dotenv", lambda: True)
+    assert configure_tracing(["--trace"]) is True
+    assert os.environ["LANGSMITH_TRACING"] == "true"
