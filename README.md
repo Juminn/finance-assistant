@@ -15,7 +15,7 @@
 uv sync
 
 # 2. 환경변수 설정 — .env.example을 복사해 키를 채운다
-#    OPENAI_API_KEY / FINLIFE_API_KEY / DATABASE_URL
+#    OPENAI_API_KEY / FINLIFE_API_KEY / DATABASE_URL (선택: LANGSMITH_* 트레이싱)
 cp .env.example .env
 
 # 3. 상품 카탈로그를 벡터 저장소에 색인 (조건 검색 기능용, 최초 1회 + 월 1회)

@@ -4,6 +4,9 @@
 프롬프트나 그래프 구조를 바꾸면 반드시 로컬에서 실행해 정확도 회귀를 확인한다.
 (실제 LLM을 호출하므로 CI에서는 돌리지 않는다.)
 
+기본으로는 LangSmith에 트레이싱하지 않는다 (89문항 = 89트레이스라 무료 한도를 잡아먹는다).
+오답 원인을 추적할 때만 --trace를 붙이면 이 실행의 LLM 호출이 트레이싱된다.
+
 라벨링 규칙과 tier의 의미는 evals/README.md 참고.
 기준선은 core tier에만 건다 — boundary는 원래 낮게 나오는 문항 묶음이라
 함께 평균 내면 회귀가 묻힌다.
@@ -133,6 +136,16 @@ def _print_breakdown(report: EvalReport) -> None:
 
 def main() -> int:
     from app.core.config import get_settings
+
+    if "--trace" in sys.argv[1:]:
+        import os
+
+        from dotenv import load_dotenv
+
+        # 이 실행만 트레이싱한다 — .env의 LANGSMITH_TRACING 값과 무관하게 켜고,
+        # API 키 등 나머지 LANGSMITH_*는 .env에서 프로세스 환경으로 올린다
+        os.environ["LANGSMITH_TRACING"] = "true"
+        load_dotenv()
 
     if not get_settings().openai_api_key:
         print("OPENAI_API_KEY가 .env에 없어 eval을 실행할 수 없습니다.")
