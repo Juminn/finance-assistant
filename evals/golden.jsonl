@@ -73,7 +73,7 @@
 {"question": "KCB랑 NICE 중에 어디 점수 보는 데가 유리해?", "intent": "loan", "tier": "boundary"}
 {"question": "월세 살다가 전세로 옮기려는데", "intent": "loan", "tier": "boundary"}
 {"question": "한도가 얼마나 나오는지 미리 알 수 있어?", "intent": "loan", "tier": "boundary"}
-{"question": "청약통장 금리 얼마야?", "intent": "general", "tier": "boundary"}
+{"question": "청약통장 금리 얼마야?", "intent": "deposit", "tier": "core"}
 {"question": "연금저축 어디가 좋아?", "intent": "general", "tier": "boundary"}
 {"question": "펀드랑 예금 중에 뭐가 나아?", "intent": "general", "tier": "boundary"}
 {"question": "DSR이 뭐야", "intent": "general", "tier": "boundary"}
@@ -87,3 +87,9 @@
 {"question": "변동금리랑 고정금리 차이가 뭐야", "intent": "general", "tier": "boundary"}
 {"question": "신용카드 할부 수수료는 어떻게 계산해?", "intent": "general", "tier": "boundary"}
 {"question": "은행이 망하면 내 돈은 어떻게 돼?", "intent": "general", "tier": "boundary"}
+{"question": "햇살론 신청 자격이 어떻게 돼?", "intent": "loan", "tier": "core"}
+{"question": "디딤돌대출 소득 조건 알려줘", "intent": "loan", "tier": "core"}
+{"question": "신생아 특례 대출 금리 얼마야?", "intent": "loan", "tier": "core"}
+{"question": "청년미래적금 정부 기여금 얼마나 줘?", "intent": "deposit", "tier": "core"}
+{"question": "청년내일저축계좌 가입 조건이 뭐야?", "intent": "deposit", "tier": "core"}
+{"question": "햇살론이 뭐야?", "intent": "general", "tier": "boundary"}
