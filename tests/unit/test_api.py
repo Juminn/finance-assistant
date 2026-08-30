@@ -1,4 +1,5 @@
 import logging
+import threading
 from collections.abc import Iterator
 from typing import Any
 
@@ -104,6 +105,63 @@ def test_실패_로그에_세션id_전문이_남지_않는다(
         client.post("/api/chat", json={"message": "안녕", "session_id": session_id})
 
     assert session_id not in caplog.text
+
+
+def test_에이전트가_실패해도_사용자_메시지는_이력에_남는다(
+    client: TestClient, fake_agent: FakeAgent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 실패한 턴의 질문이 이력에서 사라지면, 체크포인터에는 남아 있는 그 질문에
+    # 봇이 다음 턴에 답할 때 사용자 화면과 어긋난다
+    def boom(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("LLM down")
+
+    monkeypatch.setattr(fake_agent, "invoke", boom)
+    session_id = "f" * 32
+    client.post("/api/chat", json={"message": "적금 알려줘", "session_id": session_id})
+
+    messages = client.get(f"/api/history/{session_id}").json()["messages"]
+    assert [(m["role"], m["content"]) for m in messages] == [("user", "적금 알려줘")]
+
+
+def test_같은_세션의_동시_요청은_겹치지_않고_차례로_처리된다(
+    client: TestClient, fake_agent: FakeAgent, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 같은 thread_id로 동시에 invoke하면 체크포인트가 두 갈래로 갈라져
+    # 한쪽 턴이 에이전트 기억에서 사라진다 — 세션 단위로 직렬화해야 한다
+    first_entered = threading.Event()
+    release = threading.Event()
+    active = 0
+    overlapped = False
+    guard = threading.Lock()
+
+    def slow_invoke(payload: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        nonlocal active, overlapped
+        with guard:
+            active += 1
+            overlapped = overlapped or active > 1
+        first_entered.set()
+        release.wait(timeout=5)
+        with guard:
+            active -= 1
+        return {"messages": [AIMessage(content="답변")]}
+
+    monkeypatch.setattr(fake_agent, "invoke", slow_invoke)
+    session_id = "a" * 32
+
+    def post() -> None:
+        client.post("/api/chat", json={"message": "안녕", "session_id": session_id})
+
+    first = threading.Thread(target=post)
+    second = threading.Thread(target=post)
+    first.start()
+    assert first_entered.wait(timeout=5)
+    second.start()
+    second.join(timeout=0.5)  # 직렬화되어 있으면 락에서 대기하느라 끝나지 못한다
+    release.set()
+    first.join(timeout=10)
+    second.join(timeout=10)
+
+    assert not overlapped
 
 
 def test_대화_이력을_세션별로_조회한다(client: TestClient) -> None:
