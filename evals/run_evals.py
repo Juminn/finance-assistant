@@ -18,8 +18,12 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from langchain_core.messages import AnyMessage
 
 CORE_THRESHOLD = 0.9
 _GOLDEN_PATH = Path(__file__).parent / "golden.jsonl"
@@ -31,6 +35,8 @@ class EvalRecord:
     question: str
     intent: str
     tier: str = "core"
+    # 멀티턴 문항의 직전 대화. [{"role": "user"|"assistant", "content": ...}] 순서대로.
+    history: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
 
 
 @dataclass
@@ -103,9 +109,19 @@ def load_golden(path: Path = _GOLDEN_PATH) -> list[EvalRecord]:
                 question=row["question"],
                 intent=row["intent"],
                 tier=row.get("tier", "core"),
+                history=row.get("history", []),
             )
         )
     return records
+
+
+def to_messages(history: list[dict[str, str]]) -> "list[AnyMessage]":
+    """골든셋 history를 supervisor가 받는 대화 메시지 목록으로 바꾼다."""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    return [
+        (HumanMessage if turn["role"] == "user" else AIMessage)(turn["content"]) for turn in history
+    ]
 
 
 def evaluate(records: list[EvalRecord], classify: Callable[[EvalRecord], str]) -> EvalReport:
@@ -117,7 +133,8 @@ def _classify_with_llm(record: EvalRecord) -> str:
 
     from app.agents.graph import supervisor
 
-    update = supervisor({"messages": [HumanMessage(record.question)], "intent": "general"})
+    messages = [*to_messages(record.history), HumanMessage(record.question)]
+    update = supervisor({"messages": messages, "intent": "general"})
     return str(update["intent"])
 
 
