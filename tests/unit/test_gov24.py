@@ -4,9 +4,12 @@ import httpx
 import pytest
 import respx
 
+from app.tools.catalog import CATEGORIES
 from app.tools.gov24 import (
     CATEGORY,
+    DEPOSIT_CATEGORY,
     DETAIL_URL,
+    SAVING_CATEGORY,
     Gov24Error,
     exclude_known_products,
     fetch_service_details,
@@ -142,8 +145,45 @@ def test_융자형_서비스는_정책대출_카테고리로_분류한다() -> N
     loan_doc = gov24_docs([service()])[0]  # 지원유형 "현금(융자)"
     assert loan_doc.category == "정책대출"
 
-    grant_doc = gov24_docs([service(지원유형="현금", 서비스명="청년미래적금")])[0]
-    assert grant_doc.category == CATEGORY
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "청년미래적금",
+        "희망두배 청년통장",
+        "자산형성지원사업(청년내일저축계좌)",
+        "청년도약계좌",
+    ],
+)
+def test_예적금성_서비스는_적금_카테고리로_분류한다(name: str) -> None:
+    # "청년 적금" 같은 질의는 적금 카테고리로 좁혀 검색된다 —
+    # 정책 적금·통장이 정책지원에 남아 있으면 그 검색에서 구조적으로 빠진다.
+    doc = gov24_docs([service(지원유형="현금", 서비스명=name)])[0]
+    assert doc.category == SAVING_CATEGORY
+
+
+def test_예금성_서비스는_정기예금_카테고리로_분류한다() -> None:
+    doc = gov24_docs([service(지원유형="현금", 서비스명="압류방지 전용 예금")])[0]
+    assert doc.category == DEPOSIT_CATEGORY
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "전세보증금반환보증 보증료 지원",  # 상품이 아닌 지원제도
+        "저축은행 신용보증 지원",  # "저축"은 저축은행의 일부 — 예적금 단서가 아니다
+        "마이너스통장 대출이자 지원",  # 통장이 있어도 대출 관련 지원이면 상품이 아니다
+    ],
+)
+def test_상품이_아닌_지원제도는_정책지원에_남는다(name: str) -> None:
+    doc = gov24_docs([service(지원유형="현금", 서비스명=name)])[0]
+    assert doc.category == CATEGORY
+
+
+def test_상품_카테고리_상수는_공시_카테고리_어휘와_같다() -> None:
+    # 재분류된 정책 상품은 공시 상품과 같은 칸에서 검색돼야 한다
+    assert SAVING_CATEGORY in CATEGORIES
+    assert DEPOSIT_CATEGORY in CATEGORIES
 
 
 def test_문서는_지원내용과_신청정보를_담는다() -> None:
