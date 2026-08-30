@@ -4,11 +4,12 @@
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
 # pyright: reportUnknownArgumentType=false
 
-from functools import lru_cache
+from collections.abc import Sequence
+from functools import lru_cache, partial
 from typing import Any, Literal
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
@@ -35,6 +36,11 @@ from app.core.config import get_settings
 
 Intent = Literal["deposit", "loan", "general", "out_of_scope"]
 
+# LLM 입력으로 보내는 최근 메시지 수. 세션이 아무리 길어도 모든 모델 호출의
+# 입력 크기를 여기서 상한한다 (메시지 개수 기준 — 대화가 사람/AI 텍스트뿐이라
+# 토큰 추정기 없이도 충분히 안정적이다).
+HISTORY_WINDOW = 12
+
 
 class AgentState(MessagesState):
     intent: Intent
@@ -42,6 +48,47 @@ class AgentState(MessagesState):
 
 class IntentDecision(BaseModel):
     intent: Intent
+
+
+def _ai_text(message: AIMessage) -> str:
+    """AIMessage 본문 텍스트 — 블록형 콘텐츠여도 텍스트 블록만 이어 붙인다."""
+    if isinstance(message.content, str):
+        return message.content
+    return "".join(
+        block.get("text", "")
+        for block in message.content
+        if isinstance(block, dict) and block.get("type") == "text"
+    )
+
+
+def history_for_llm(messages: Sequence[AnyMessage]) -> list[AnyMessage]:
+    """모델 입력용 대화 뷰 — 사람·AI 텍스트만 최근 HISTORY_WINDOW개 남긴다.
+
+    도구 호출·결과 메시지는 걸러낸다. 워커의 도구 왕복이 이력에 실리면
+    (1) 분류용 supervisor 입력에까지 상품표 전문이 매 턴 들어가고,
+    (2) 다른 워커가 자기에게 바인딩되지 않은 도구를 이력에서 보고 흉내 내며,
+    (3) tool_calls와 ToolMessage 짝이 잘리면 OpenAI가 400을 반환한다.
+    본문과 tool_calls가 함께 있는 AIMessage는 본문만 남긴다.
+    """
+    kept: list[AnyMessage] = []
+    for message in messages:
+        if isinstance(message, HumanMessage):
+            kept.append(message)
+        elif isinstance(message, AIMessage):
+            text = _ai_text(message)
+            if text.strip():
+                kept.append(AIMessage(text) if message.tool_calls else message)
+    return kept[-HISTORY_WINDOW:]
+
+
+def run_worker(agent: Any, state: AgentState) -> dict[str, Any]:
+    """워커를 정리된 이력으로 호출하고 최종 답변만 부모 상태에 남긴다.
+
+    중간 도구 호출·결과는 체크포인트에 올리지 않는다 — 후속 질문에 필요한
+    정보는 최종 답변 텍스트(상품명·금리 목록)에 이미 들어 있다.
+    """
+    result = agent.invoke({"messages": history_for_llm(state["messages"])})
+    return {"messages": [result["messages"][-1]]}
 
 
 def _chat_model() -> ChatOpenAI:
@@ -57,7 +104,7 @@ def supervisor(state: AgentState) -> dict[str, Any]:
     decision = (
         _chat_model()
         .with_structured_output(IntentDecision)
-        .invoke([SystemMessage(SUPERVISOR_SYSTEM), *state["messages"]])
+        .invoke([SystemMessage(SUPERVISOR_SYSTEM), *history_for_llm(state["messages"])])
     )
     assert isinstance(decision, IntentDecision)
     return {"intent": decision.intent}
@@ -71,7 +118,9 @@ def route_by_intent(state: AgentState) -> str:
 
 
 def general(state: AgentState) -> dict[str, Any]:
-    reply = _chat_model().invoke([SystemMessage(GENERAL_AGENT_SYSTEM), *state["messages"]])
+    reply = _chat_model().invoke(
+        [SystemMessage(GENERAL_AGENT_SYSTEM), *history_for_llm(state["messages"])]
+    )
     return {"messages": [reply]}
 
 
@@ -89,10 +138,13 @@ def out_of_scope(state: AgentState) -> dict[str, Any]:
 def build_graph(
     checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    # 워커는 run_worker 래퍼로 호출한다. 자체 체크포인트는 남길 것이 없으므로
+    # 부모 체크포인터 상속을 끈다(checkpointer=False).
     deposit_agent = create_agent(
         _chat_model(),
         tools=[compare_deposit_products, compare_saving_products, search_products_by_condition],
         system_prompt=DEPOSIT_AGENT_SYSTEM,
+        checkpointer=False,
     )
     loan_agent = create_agent(
         _chat_model(),
@@ -103,12 +155,13 @@ def build_graph(
             search_products_by_condition,
         ],
         system_prompt=LOAN_AGENT_SYSTEM,
+        checkpointer=False,
     )
 
     builder = StateGraph(AgentState)
     builder.add_node("supervisor", supervisor)
-    builder.add_node("deposit", deposit_agent)
-    builder.add_node("loan", loan_agent)
+    builder.add_node("deposit", partial(run_worker, deposit_agent))
+    builder.add_node("loan", partial(run_worker, loan_agent))
     builder.add_node("general", general)
     builder.add_node("out_of_scope", out_of_scope)
     builder.add_edge(START, "supervisor")

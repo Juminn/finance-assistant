@@ -1,13 +1,16 @@
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.graph import (
+    HISTORY_WINDOW,
     AgentState,
     IntentDecision,
     build_graph,
+    history_for_llm,
     out_of_scope,
     route_by_intent,
+    run_worker,
     supervisor,
 )
 from app.agents.prompts import OUT_OF_SCOPE_REPLY
@@ -81,3 +84,70 @@ def test_거절_문구는_대신_할_수_있는_일을_안내한다() -> None:
     # 그냥 거절만 하면 사용자가 다음에 뭘 물어야 할지 알 수 없다
     assert "정기예금" in OUT_OF_SCOPE_REPLY
     assert "대출" in OUT_OF_SCOPE_REPLY
+
+
+def test_llm_입력_이력에서_도구_호출과_결과_메시지를_거른다() -> None:
+    # 과거 턴의 도구 흔적이 다른 워커 LLM에 들어가면 자기에게 없는 도구를
+    # 흉내 내 호출하거나 분류 입력에 상품표 전문이 실린다
+    messages = [
+        HumanMessage("적금 비교해줘"),
+        AIMessage("", tool_calls=[{"name": "compare_saving_products", "args": {}, "id": "c1"}]),
+        ToolMessage("1위 A은행 연 5.0% ...", tool_call_id="c1"),
+        AIMessage("1위는 A은행 연 5.0%입니다."),
+        HumanMessage("전세대출은 어때?"),
+    ]
+    view = history_for_llm(messages)
+    assert [type(m) for m in view] == [HumanMessage, AIMessage, HumanMessage]
+    assert view[1].content == "1위는 A은행 연 5.0%입니다."
+
+
+def test_llm_입력_이력에서_본문이_있는_툴콜_메시지는_본문만_남긴다() -> None:
+    # tool_calls가 붙은 채 보내면 대응 ToolMessage가 없어 OpenAI가 400을 낸다
+    msg = AIMessage("조회해 볼게요.", tool_calls=[{"name": "t", "args": {}, "id": "c1"}])
+    (only,) = history_for_llm([HumanMessage("적금?"), msg])[1:]
+    assert isinstance(only, AIMessage)
+    assert only.content == "조회해 볼게요."
+    assert only.tool_calls == []
+
+
+def test_llm_입력_이력은_최근_메시지만_남긴다() -> None:
+    messages = [HumanMessage(f"질문 {i}") for i in range(HISTORY_WINDOW + 5)]
+    view = history_for_llm(messages)
+    assert len(view) == HISTORY_WINDOW
+    assert view[-1].content == f"질문 {HISTORY_WINDOW + 4}"
+
+
+class FakeWorkerAgent:
+    """받은 이력을 기록하고, 도구 왕복이 섞인 결과를 돌려주는 가짜 서브에이전트."""
+
+    def __init__(self) -> None:
+        self.seen: list[Any] = []
+
+    def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.seen = list(payload["messages"])
+        return {
+            "messages": [
+                *self.seen,
+                AIMessage("", tool_calls=[{"name": "compare", "args": {}, "id": "c9"}]),
+                ToolMessage("상품표 전문", tool_call_id="c9"),
+                AIMessage("최종 답변입니다."),
+            ]
+        }
+
+
+def test_워커는_정리된_이력만_받고_최종_답변만_상태에_남긴다() -> None:
+    worker = FakeWorkerAgent()
+    state: AgentState = {
+        "messages": [
+            HumanMessage("적금 비교해줘"),
+            AIMessage("", tool_calls=[{"name": "compare", "args": {}, "id": "c1"}]),
+            ToolMessage("지난 턴 상품표", tool_call_id="c1"),
+            AIMessage("지난 턴 답변"),
+            HumanMessage("전세대출은?"),
+        ],
+        "intent": "loan",
+    }
+    update = run_worker(worker, state)
+
+    assert not any(isinstance(m, ToolMessage) for m in worker.seen)
+    assert [m.content for m in update["messages"]] == ["최종 답변입니다."]
