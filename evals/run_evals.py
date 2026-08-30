@@ -4,7 +4,7 @@
 프롬프트나 그래프 구조를 바꾸면 반드시 로컬에서 실행해 정확도 회귀를 확인한다.
 (실제 LLM을 호출하므로 CI에서는 돌리지 않는다.)
 
-기본으로는 LangSmith에 트레이싱하지 않는다 (89문항 = 89트레이스라 무료 한도를 잡아먹는다).
+기본으로는 LangSmith에 트레이싱하지 않는다 (문항 수만큼 트레이스가 쌓여 무료 한도를 잡아먹는다).
 오답 원인을 추적할 때만 --trace를 붙이면 이 실행의 LLM 호출이 트레이싱된다.
 
 라벨링 규칙과 tier의 의미는 evals/README.md 참고.
@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 CORE_THRESHOLD = 0.9
 _GOLDEN_PATH = Path(__file__).parent / "golden.jsonl"
-_INTENTS = ("deposit", "loan", "general")
+_INTENTS = ("deposit", "loan", "general", "out_of_scope")
 
 
 @dataclass

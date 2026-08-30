@@ -50,7 +50,7 @@
 {"question": "단리랑 복리 차이가 뭐야", "intent": "general", "tier": "core"}
 {"question": "인플레이션이 뭐야", "intent": "general", "tier": "core"}
 {"question": "넌 누구야?", "intent": "general", "tier": "core"}
-{"question": "오늘 날씨 어때", "intent": "general", "tier": "core"}
+{"question": "오늘 날씨 어때", "intent": "out_of_scope", "tier": "core"}
 {"question": "이자소득세는 몇 퍼센트야?", "intent": "general", "tier": "core"}
 {"question": "신용점수 올리는 방법 알려줘", "intent": "general", "tier": "core"}
 {"question": "연말정산은 어떻게 하는 거야", "intent": "general", "tier": "core"}
@@ -93,3 +93,17 @@
 {"question": "청년미래적금 정부 기여금 얼마나 줘?", "intent": "deposit", "tier": "core"}
 {"question": "청년내일저축계좌 가입 조건이 뭐야?", "intent": "deposit", "tier": "core"}
 {"question": "햇살론이 뭐야?", "intent": "general", "tier": "boundary"}
+{"question": "파이썬으로 리스트 정렬하는 코드 짜줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "김치찌개 맛있게 끓이는 법 알려줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "이 문장 영어로 번역해줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "감기 걸렸는데 무슨 약 먹어야 해?", "intent": "out_of_scope", "tier": "core"}
+{"question": "주말에 서울에서 갈 만한 데 추천해줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "초등학생 수학 문제 좀 풀어줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "자기소개서 좀 대신 써줘", "intent": "out_of_scope", "tier": "core"}
+{"question": "이자 계산하는 파이썬 함수 짜줘", "intent": "out_of_scope", "tier": "boundary"}
+{"question": "은행원 연봉 얼마나 돼?", "intent": "out_of_scope", "tier": "boundary"}
+{"question": "금융권 취업하려면 뭘 준비해야 해?", "intent": "out_of_scope", "tier": "boundary"}
+{"question": "'예금'으로 삼행시 지어줘", "intent": "out_of_scope", "tier": "boundary"}
+{"question": "심심한데 아무 얘기나 하자", "intent": "out_of_scope", "tier": "boundary"}
+{"question": "너 무슨 AI 모델로 만들어졌어?", "intent": "general", "tier": "boundary"}
+{"question": "이 챗봇으로 뭘 물어볼 수 있는지 예시 좀 줘", "intent": "general", "tier": "boundary"}

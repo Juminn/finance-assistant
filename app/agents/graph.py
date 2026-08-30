@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from langchain.agents import create_agent
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
@@ -20,6 +20,7 @@ from app.agents.prompts import (
     DEPOSIT_AGENT_SYSTEM,
     GENERAL_AGENT_SYSTEM,
     LOAN_AGENT_SYSTEM,
+    OUT_OF_SCOPE_REPLY,
     SUPERVISOR_SYSTEM,
 )
 from app.agents.tools import (
@@ -32,7 +33,7 @@ from app.agents.tools import (
 )
 from app.core.config import get_settings
 
-Intent = Literal["deposit", "loan", "general"]
+Intent = Literal["deposit", "loan", "general", "out_of_scope"]
 
 
 class AgentState(MessagesState):
@@ -64,7 +65,7 @@ def supervisor(state: AgentState) -> dict[str, Any]:
 
 def route_by_intent(state: AgentState) -> str:
     intent = state.get("intent")
-    if intent in ("deposit", "loan"):
+    if intent in ("deposit", "loan", "out_of_scope"):
         return intent
     return "general"
 
@@ -72,6 +73,15 @@ def route_by_intent(state: AgentState) -> str:
 def general(state: AgentState) -> dict[str, Any]:
     reply = _chat_model().invoke([SystemMessage(GENERAL_AGENT_SYSTEM), *state["messages"]])
     return {"messages": [reply]}
+
+
+def out_of_scope(state: AgentState) -> dict[str, Any]:
+    """금융 범위 밖 질문은 LLM을 태우지 않고 고정 문구로 돌려보낸다.
+
+    프롬프트로만 막으면 대화를 이어가며 설득당할 여지가 남는다.
+    라우팅에서 끊으면 거절이 결정적이고, 토큰도 쓰지 않는다.
+    """
+    return {"messages": [AIMessage(OUT_OF_SCOPE_REPLY)]}
 
 
 def build_graph(
@@ -98,11 +108,15 @@ def build_graph(
     builder.add_node("deposit", deposit_agent)
     builder.add_node("loan", loan_agent)
     builder.add_node("general", general)
+    builder.add_node("out_of_scope", out_of_scope)
     builder.add_edge(START, "supervisor")
-    builder.add_conditional_edges("supervisor", route_by_intent, ["deposit", "loan", "general"])
+    builder.add_conditional_edges(
+        "supervisor", route_by_intent, ["deposit", "loan", "general", "out_of_scope"]
+    )
     builder.add_edge("deposit", END)
     builder.add_edge("loan", END)
     builder.add_edge("general", END)
+    builder.add_edge("out_of_scope", END)
     return builder.compile(checkpointer=checkpointer)
 
 

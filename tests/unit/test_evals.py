@@ -9,8 +9,15 @@ from evals.run_evals import EvalRecord, configure_tracing, evaluate, load_golden
 def test_골든셋_파일을_로드한다() -> None:
     records = load_golden()
     assert len(records) >= 80
-    assert all(r.intent in ("deposit", "loan", "general") for r in records)
+    assert all(r.intent in ("deposit", "loan", "general", "out_of_scope") for r in records)
     assert all(r.tier in ("core", "boundary") for r in records)
+
+
+def test_골든셋에_범위_밖_문항이_tier별로_들어있다() -> None:
+    # 거절 정책이 회귀하면 여기서 잡혀야 하므로 core·boundary 양쪽에 문항을 둔다
+    off_topic = [r for r in load_golden() if r.intent == "out_of_scope"]
+    assert sum(1 for r in off_topic if r.tier == "core") >= 5
+    assert sum(1 for r in off_topic if r.tier == "boundary") >= 3
 
 
 def test_골든셋에_중복_문항이_없다() -> None:
