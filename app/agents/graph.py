@@ -13,7 +13,6 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, SecretStr
@@ -34,6 +33,7 @@ from app.agents.tools import (
     search_products_by_condition,
 )
 from app.core.config import get_settings
+from app.db.checkpointer import make_checkpointer
 
 Intent = Literal["deposit", "loan", "general", "out_of_scope"]
 
@@ -92,7 +92,10 @@ def run_worker(agent: Any, state: AgentState) -> dict[str, Any]:
     return {"messages": [result["messages"][-1]]}
 
 
+@lru_cache
 def _chat_model() -> ChatOpenAI:
+    """프로세스당 하나만 만든다 — 생성 시 sync·async httpx 클라이언트가 즉시 생기므로
+    supervisor처럼 모든 요청이 지나는 경로에서 매번 만들면 커넥션 풀이 버려진다."""
     settings = get_settings()
     # 키가 없어도 그래프 구축은 가능해야 한다 (실 호출 시점에만 실패)
     return ChatOpenAI(
@@ -191,5 +194,5 @@ def build_graph(
 
 @lru_cache
 def get_agent() -> CompiledStateGraph[AgentState, Any, Any, Any]:
-    """프로세스 전역 에이전트 — 멀티턴 상태는 메모리 체크포인터(thread_id)로 유지."""
-    return build_graph(checkpointer=MemorySaver())
+    """프로세스 전역 에이전트 — 멀티턴 상태(thread_id)는 DATABASE_URL 체크포인터로 유지."""
+    return build_graph(checkpointer=make_checkpointer(get_settings().database_url))

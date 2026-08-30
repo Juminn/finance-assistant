@@ -23,6 +23,16 @@ def is_postgres(url: str) -> bool:
     return url.startswith(("postgresql://", "postgres://", "postgresql+"))
 
 
+def to_psycopg_conninfo(url: str) -> str:
+    """postgresql:// 계열 주소를 psycopg.connect가 받는 conninfo로 바꾼다.
+
+    psycopg는 SQLAlchemy의 +드라이버 스킴(postgresql+psycopg://)을 모른다.
+    """
+    if _POSTGRES_SCHEME.match(url):
+        return _POSTGRES_SCHEME.sub("postgresql://", url)
+    return url
+
+
 def make_engine(url: str) -> Engine:
     """SQLite 파일이면 폴더를 만들어주고, 메모리 DB면 커넥션을 공유하게 만든다."""
     if url in ("sqlite://", "sqlite:///:memory:"):

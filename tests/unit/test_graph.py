@@ -1,6 +1,7 @@
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.agents.graph import (
     HISTORY_WINDOW,
@@ -120,6 +121,38 @@ def test_거절_문구는_대신_할_수_있는_일을_안내한다() -> None:
     # 그냥 거절만 하면 사용자가 다음에 뭘 물어야 할지 알 수 없다
     assert "정기예금" in OUT_OF_SCOPE_REPLY
     assert "대출" in OUT_OF_SCOPE_REPLY
+
+
+def test_챗_모델은_프로세스당_한_번만_만든다() -> None:
+    # 생성 시점에 sync·async httpx 클라이언트를 즉시 만들므로, supervisor처럼
+    # 모든 요청이 지나는 경로에서 매번 새로 만들면 커넥션 풀이 그대로 버려진다
+    import app.agents.graph as graph_module
+
+    chat_model = graph_module._chat_model  # pyright: ignore[reportPrivateUsage]
+    chat_model.cache_clear()
+    try:
+        assert chat_model() is chat_model()
+    finally:
+        chat_model.cache_clear()
+
+
+def test_전역_에이전트는_설정의_DB_URL로_체크포인터를_만든다(monkeypatch: Any) -> None:
+    import app.agents.graph as graph_module
+
+    saver = MemorySaver()
+    seen: list[str] = []
+
+    def fake_make_checkpointer(url: str) -> MemorySaver:
+        seen.append(url)
+        return saver
+
+    monkeypatch.setattr(graph_module, "make_checkpointer", fake_make_checkpointer)
+    graph_module.get_agent.cache_clear()
+    try:
+        graph_module.get_agent()
+        assert seen == [graph_module.get_settings().database_url]
+    finally:
+        graph_module.get_agent.cache_clear()
 
 
 def test_llm_입력_이력에서_도구_호출과_결과_메시지를_거른다() -> None:
