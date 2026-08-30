@@ -78,8 +78,10 @@ def general(state: AgentState) -> dict[str, Any]:
 def out_of_scope(state: AgentState) -> dict[str, Any]:
     """금융 범위 밖 질문은 LLM을 태우지 않고 고정 문구로 돌려보낸다.
 
-    프롬프트로만 막으면 대화를 이어가며 설득당할 여지가 남는다.
-    라우팅에서 끊으면 거절이 결정적이고, 토큰도 쓰지 않는다.
+    이유는 결정성이다 — 프롬프트로만 막으면 대화를 이어가며 설득당할 여지가
+    남지만, 라우팅에서 끊은 거절은 말로 뒤집을 수 없다.
+    분류용 supervisor 호출은 어차피 도므로 토큰이 공짜가 되지는 않고,
+    답변 생성 호출 한 번(측정값 in 233 / out 427)을 아끼는 것이다.
     """
     return {"messages": [AIMessage(OUT_OF_SCOPE_REPLY)]}
 
