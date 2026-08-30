@@ -112,3 +112,13 @@ def test_대화_이력을_세션별로_조회한다(client: TestClient) -> None:
     assert response.status_code == 200
     roles = [m["role"] for m in response.json()["messages"]]
     assert roles == ["user", "assistant"]
+
+
+@pytest.mark.parametrize("path", ["/", "/index.html", "/app.js", "/styles.css"])
+def test_정적_파일은_쓰기_전에_재검증하게_내려준다(client: TestClient, path: str) -> None:
+    # web/이 index.html·app.js·styles.css로 나뉘어 있어, 브라우저가 파일마다 따로
+    # 캐시하면 새 HTML과 낡은 JS가 섞인 상태가 만들어진다. no-cache는 캐시를 막는
+    # 것이 아니라 쓰기 전에 서버에 묻게 하므로(변경 없으면 304) 비용은 작다.
+    response = client.get(path)
+    assert response.status_code == 200
+    assert "no-cache" in response.headers.get("cache-control", "")
