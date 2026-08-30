@@ -67,7 +67,9 @@
   const form = document.getElementById("chat-form");
   const input = document.getElementById("chat-input");
 
-  let sessionId = sessionStorage.getItem("session_id") || null;
+  // session_id는 페이지 수명 동안만 유지한다. sessionStorage에 넣으면
+  // 탭 복제 시 그대로 복사되어 두 탭이 한 대화 스레드를 공유하게 된다.
+  let sessionId = null;
 
   function addMessage(role, text) {
     const div = document.createElement("div");
@@ -94,7 +96,6 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       sessionId = data.session_id;
-      try { sessionStorage.setItem("session_id", sessionId); } catch {}
       thinking.textContent = data.reply;
     } catch (err) {
       thinking.textContent = `오류가 발생했어요: ${err.message}`;
