@@ -2,107 +2,78 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
 <title>금융 통합 비서</title>
-<style>
-  :root {
-    --bg: #f4f6f9; --card: #ffffff; --ink: #1c2733; --sub: #6b7a8c;
-    --accent: #2563eb; --accent-ink: #ffffff; --line: #e3e8ef;
-  }
-  * { box-sizing: border-box; margin: 0; }
-  body {
-    font-family: "Segoe UI", "Malgun Gothic", sans-serif;
-    background: var(--bg); color: var(--ink);
-    display: flex; flex-direction: column; height: 100dvh;
-  }
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--line);
-  }
-  header h1 { font-size: 17px; }
-  button {
-    border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer;
-    background: var(--accent); color: var(--accent-ink); font-size: 13px;
-  }
-  #messages {
-    flex: 1; overflow-y: auto; padding: 20px;
-    display: flex; flex-direction: column; gap: 10px; max-width: 760px; width: 100%;
-    margin: 0 auto;
-  }
-  .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px;
-         line-height: 1.55; white-space: pre-wrap; }
-  .user { align-self: flex-end; background: var(--accent); color: #fff;
-          border-bottom-right-radius: 4px; }
-  .assistant { align-self: flex-start; background: var(--card);
-               border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-  .hint { align-self: center; color: var(--sub); font-size: 13px; text-align: center; }
-  footer {
-    padding: 14px 20px 20px; background: var(--bg);
-  }
-  form { display: flex; gap: 8px; max-width: 760px; margin: 0 auto; }
-  form input {
-    flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
-    font-size: 14px; background: var(--card);
-  }
-</style>
+<link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <header>
-    <h1>💬 금융 통합 비서</h1>
+    <div class="brand">
+      <h1>금융 통합 비서</h1>
+      <p class="brand-sub">금융감독원 공시 · 정책금융 공공데이터 기반 상품 비교</p>
+    </div>
+    <button id="new-chat" type="button" class="ghost">새 대화</button>
   </header>
 
-  <div id="messages">
-    <div class="hint">예금·적금·대출 상품 비교를 도와드려요.<br/>예: "1년 정기예금 금리 높은 순으로 알려줘", "급여이체 우대 있는 적금"</div>
-  </div>
+  <main id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="대화 내용"></main>
+
+  <button id="scroll-bottom" type="button" hidden>새 답변 ↓</button>
 
   <footer>
-    <form id="chat-form">
-      <input id="chat-input" placeholder="메시지를 입력하세요" autocomplete="off" />
-      <button type="submit">전송</button>
+    <form id="chat-form" autocomplete="off">
+      <input id="chat-input" type="text" placeholder="예금·적금·대출에 대해 물어보세요" aria-label="메시지 입력" />
+      <button id="send" type="submit">전송</button>
     </form>
+    <p class="legal">
+      가입 권유나 투자 자문이 아닌 비교 정보예요. · 로그인 없이 이용하며 개인정보를 수집하지 않아요.
+    </p>
   </footer>
 
-<script>
-  const messagesEl = document.getElementById("messages");
-  const form = document.getElementById("chat-form");
-  const input = document.getElementById("chat-input");
+  <!-- 웰컴 화면. "새 대화"를 누르면 이 템플릿을 그대로 다시 그린다. -->
+  <template id="welcome-tpl">
+    <section class="welcome">
+      <h2>무엇을 도와드릴까요?</h2>
+      <p class="welcome-lead">
+        금융감독원 공시와 공공데이터를 실시간으로 조회해 조건에 맞는 상품을 비교해드려요.
+      </p>
 
-  // session_id는 페이지 수명 동안만 유지한다. sessionStorage에 넣으면
-  // 탭 복제 시 그대로 복사되어 두 탭이 한 대화 스레드를 공유하게 된다.
-  let sessionId = null;
+      <!-- 상품 건수는 README.md의 데이터 소스 설명이 기준이다. 색인 범위를 넓히면 같이 고칠 것. -->
+      <ul class="cards">
+        <li>
+          <span class="card-tag">금리 비교</span>
+          <p>정기예금·적금·주택담보대출·전세자금대출·개인신용대출 <b>1,042개</b> 상품을 금리순으로</p>
+        </li>
+        <li>
+          <span class="card-tag">정책금융상품</span>
+          <p>햇살론·디딤돌·버팀목 등 정책대출 <b>325종</b>과 청년미래적금 등 자산형성 지원 <b>559종</b></p>
+        </li>
+        <li>
+          <span class="card-tag">조건 검색</span>
+          <p>“급여이체 우대”, “중도상환수수료 없는”처럼 문장으로 설명한 조건도 찾아드려요</p>
+        </li>
+        <li>
+          <span class="card-tag">용어·제도 설명</span>
+          <p>복리, 중도상환수수료, 예금자보호 같은 금융 용어와 제도를 풀어드려요</p>
+        </li>
+      </ul>
 
-  function addMessage(role, text) {
-    const div = document.createElement("div");
-    div.className = `msg ${role}`;
-    div.textContent = text;
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return div;
-  }
+      <p class="chips-label">이렇게 물어보세요</p>
+      <div class="chips">
+        <button class="chip" type="button">1년 정기예금 금리 높은 순으로 알려줘</button>
+        <button class="chip" type="button">급여이체 우대 있는 적금 찾아줘</button>
+        <button class="chip" type="button">무주택 청년이 받을 수 있는 전세자금대출 알려줘</button>
+        <button class="chip" type="button">청년이 가입할 수 있는 정책 적금 뭐가 있어?</button>
+        <button class="chip" type="button">중도상환수수료가 뭐야?</button>
+      </div>
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = "";
-    addMessage("user", text);
-    const thinking = addMessage("assistant", "생각 중…");
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      sessionId = data.session_id;
-      thinking.textContent = data.reply;
-    } catch (err) {
-      thinking.textContent = `오류가 발생했어요: ${err.message}`;
-    }
-  });
+      <p class="scope">
+        금융상품 비교와 금융 용어·제도 설명만 도와드려요.
+        주식·펀드·보험 상품 추천이나 금융과 무관한 주제는 정중히 거절해요.
+      </p>
+    </section>
+  </template>
 
-  input.focus();
-</script>
+  <script src="/app.js"></script>
 </body>
 </html>
