@@ -16,6 +16,7 @@ from app.tools.catalog import CATEGORIES
 from app.tools.condition import drop_weak_matches, format_matches, infer_category
 from app.tools.deposit import format_deposit_products, search_deposit_products
 from app.tools.finlife import FinlifeError
+from app.tools.gov24 import CATEGORY as SUPPORT_CATEGORY
 from app.tools.loan import (
     format_credit_loans,
     format_secured_loans,
@@ -24,6 +25,7 @@ from app.tools.loan import (
     search_rent_loans,
 )
 from app.tools.saving import format_saving_products, search_saving_products
+from app.tools.smfg import CATEGORY as POLICY_LOAN_CATEGORY
 
 
 def _with_client(run: Callable[[httpx.Client, str], str]) -> str:
@@ -113,6 +115,9 @@ def compare_credit_loans(top_n: int = 5) -> str:
 _TOP_K = 5
 _INDEX_NOT_READY = "조건 검색 색인이 아직 준비되지 않았습니다. 금리 비교 도구를 대신 사용하세요."
 
+# 조건 검색이 받는 카테고리 어휘 — 금감원 공시 5종 + 정책상품 2종
+SEARCH_CATEGORIES: tuple[str, ...] = (*CATEGORIES, POLICY_LOAN_CATEGORY, SUPPORT_CATEGORY)
+
 
 @lru_cache
 def _openai_client() -> OpenAI:
@@ -126,9 +131,14 @@ def search_products_by_condition(query: str, category: str = "") -> str:
     금리 순위 비교가 아니라 "급여이체 우대가 있는 적금", "중도상환수수료 없는 대출",
     "청년만 가입할 수 있는 상품"처럼 조건을 말로 설명할 때 쓴다.
 
+    정책금융상품도 여기서 찾는다: 정책대출(햇살론·디딤돌·버팀목·보금자리론 등
+    정부 지원 대출)과 정책지원(청년미래적금·청년내일저축계좌 같은 정책 적금·
+    자산형성, 각종 금융 지원제도).
+
     Args:
         query: 찾고 싶은 조건을 담은 문장.
-        category: 좁히고 싶을 때만 지정. 정기예금/적금/주택담보대출/전세자금대출/개인신용대출.
+        category: 좁히고 싶을 때만 지정.
+            정기예금/적금/주택담보대출/전세자금대출/개인신용대출/정책대출/정책지원.
     """
     settings = get_settings()
     if not vector_search_enabled():
@@ -137,7 +147,7 @@ def search_products_by_condition(query: str, category: str = "") -> str:
         return "조건 검색에 필요한 OpenAI 키가 설정되지 않았습니다."
 
     requested_category = category
-    if category not in CATEGORIES:
+    if category not in SEARCH_CATEGORIES:
         category = ""
 
     # 카테고리를 안 주면 질의문에서 추론한다. 색인이 커질수록 전체 검색은
@@ -162,7 +172,7 @@ def search_products_by_condition(query: str, category: str = "") -> str:
         return "조건 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
     note = ""
-    if requested_category and requested_category not in CATEGORIES:
+    if requested_category and requested_category not in SEARCH_CATEGORIES:
         note = f"[참고] '{requested_category}' 카테고리를 인식하지 못해 전체에서 검색했습니다.\n"
     elif inferred_category:
         note = f"[참고] 질의를 보고 '{inferred_category}' 카테고리로 좁혀 검색했습니다.\n"
