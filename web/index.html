@@ -58,13 +58,15 @@
         </li>
       </ul>
 
+      <!-- 라벨은 훑어보기 좋게 짧게 두고, 실제로 보낼 문장은 data-q에 담는다.
+           라벨을 그대로 보내면 좁은 화면에서 칩이 한 줄에 하나씩 차지한다. -->
       <p class="chips-label">이렇게 물어보세요</p>
       <div class="chips">
-        <button class="chip" type="button">1년 정기예금 금리 높은 순으로 알려줘</button>
-        <button class="chip" type="button">급여이체 우대 있는 적금 찾아줘</button>
-        <button class="chip" type="button">무주택 청년이 받을 수 있는 전세자금대출 알려줘</button>
-        <button class="chip" type="button">청년이 가입할 수 있는 정책 적금 뭐가 있어?</button>
-        <button class="chip" type="button">중도상환수수료가 뭐야?</button>
+        <button class="chip" type="button" data-q="1년 정기예금 금리 높은 순으로 알려줘">1년 정기예금 금리 순위</button>
+        <button class="chip" type="button" data-q="급여이체 우대 있는 적금 찾아줘">급여이체 우대 적금</button>
+        <button class="chip" type="button" data-q="무주택 청년이 받을 수 있는 전세자금대출 알려줘">청년 전세자금대출</button>
+        <button class="chip" type="button" data-q="청년이 가입할 수 있는 정책 적금 뭐가 있어?">청년 정책 적금</button>
+        <button class="chip" type="button" data-q="중도상환수수료가 뭐야?">중도상환수수료란?</button>
       </div>
 
       <p class="scope">
