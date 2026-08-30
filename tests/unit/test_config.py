@@ -7,6 +7,7 @@ _ENV_KEYS = (
     "OPENAI_API_KEY",
     "OPENAI_MODEL",
     "FINLIFE_API_KEY",
+    "DATA_GO_KR_API_KEY",
     "LANGSMITH_TRACING",
     "LANGSMITH_API_KEY",
     "DATABASE_URL",
@@ -31,7 +32,16 @@ def test_기본값은_빈_키와_기본_모델을_가진다(clean_env: None) -> 
     assert settings.openai_api_key == ""
     assert settings.openai_model == "gpt-5-mini"
     assert settings.finlife_api_key == ""
+    assert settings.data_go_kr_api_key == ""
     assert settings.langsmith_tracing is False
+
+
+def test_공공데이터포털_키를_환경변수에서_읽는다(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATA_GO_KR_API_KEY", "portal-key")
+    settings = SettingsWithoutDotenv()
+    assert settings.data_go_kr_api_key == "portal-key"
 
 
 def test_환경변수가_기본값을_덮어쓴다(clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
