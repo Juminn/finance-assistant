@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
     finlife_api_key: str = ""
+    data_go_kr_api_key: str = ""
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
     database_url: str = _DEFAULT_DATABASE_URL
