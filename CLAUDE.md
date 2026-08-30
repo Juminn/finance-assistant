@@ -34,6 +34,8 @@
 ## 커밋
 - 기능 단위로 작게 커밋한다. conventional commits (feat / fix / test / chore / docs / refactor).
 - 커밋 전 `uv run pre-commit run -a`와 `uv run pytest`가 통과해야 한다.
+- **main에 직접 커밋·머지하지 않는다.** 기능 브랜치에서 작업해 PR을 올리고,
+  CI 통과를 확인한 뒤 머지한다. 로컬에서 main을 fast-forward하지 말 것.
 
 ## 명령어
 - 의존성 설치: `uv sync`
