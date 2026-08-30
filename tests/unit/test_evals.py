@@ -1,9 +1,10 @@
 import os
 
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage
 
 import evals.run_evals as run_evals
-from evals.run_evals import EvalRecord, configure_tracing, evaluate, load_golden
+from evals.run_evals import EvalRecord, configure_tracing, evaluate, load_golden, to_messages
 
 
 def test_골든셋_파일을_로드한다() -> None:
@@ -23,6 +24,32 @@ def test_골든셋에_범위_밖_문항이_tier별로_들어있다() -> None:
 def test_골든셋에_중복_문항이_없다() -> None:
     questions = [r.question for r in load_golden()]
     assert len(set(questions)) == len(questions)
+
+
+def test_골든셋에_멀티턴_문항이_들어있다() -> None:
+    # supervisor 프롬프트가 약속하는 맥락 라우팅("두 번째 거 자세히" → deposit)은
+    # 단일턴 문항만으로는 회귀를 잡을 수 없다
+    with_history = [r for r in load_golden() if r.history]
+    assert len(with_history) >= 4
+    for record in with_history:
+        assert all(
+            turn["role"] in ("user", "assistant") and turn["content"] for turn in record.history
+        )
+
+
+def test_이력은_역할에_맞는_대화_메시지로_변환된다() -> None:
+    history = [
+        {"role": "user", "content": "1년 정기예금 비교해줘"},
+        {"role": "assistant", "content": "1위 A은행 연 3.5%입니다."},
+    ]
+    messages = to_messages(history)
+    assert [type(m) for m in messages] == [HumanMessage, AIMessage]
+    assert [m.content for m in messages] == ["1년 정기예금 비교해줘", "1위 A은행 연 3.5%입니다."]
+
+
+def test_이력이_없으면_빈_메시지_목록이다() -> None:
+    assert to_messages([]) == []
+    assert EvalRecord(question="예금 비교", intent="deposit").history == []
 
 
 def test_전부_맞으면_정확도_1이고_오답_목록이_비어있다() -> None:

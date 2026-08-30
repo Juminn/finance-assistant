@@ -106,3 +106,9 @@
 {"question": "'예금'으로 삼행시 지어줘", "intent": "out_of_scope", "tier": "boundary"}
 {"question": "심심한데 아무 얘기나 하자", "intent": "out_of_scope", "tier": "boundary"}
 {"question": "이 챗봇으로 뭘 물어볼 수 있는지 예시 좀 줘", "intent": "general", "tier": "boundary"}
+{"question": "두 번째 거 자세히 알려줘", "intent": "deposit", "tier": "core", "history": [{"role": "user", "content": "1년 정기예금 금리 비교해줘"}, {"role": "assistant", "content": "1위 A은행 정기예금 연 3.5%, 2위 B저축은행 e-정기예금 연 3.4%, 3위 C은행 스마트예금 연 3.3%입니다. 공시월 202608 기준이에요."}]}
+{"question": "덕분에 정리됐어, 고마워", "intent": "general", "tier": "core", "history": [{"role": "user", "content": "전세자금대출 금리 비교해줘"}, {"role": "assistant", "content": "최저금리 순으로 A은행 연 3.2%, B은행 연 3.4%, C은행 연 3.5%입니다. 공시월 202608 기준이에요."}]}
+{"question": "그중에 청년만 가입할 수 있는 것도 있어?", "intent": "deposit", "tier": "core", "history": [{"role": "user", "content": "적금 금리 높은 순으로 보여줘"}, {"role": "assistant", "content": "1위 A은행 청년희망적금 연 5.0%, 2위 B은행 정기적금 연 4.2%, 3위 C저축은행 자유적금 연 4.0%입니다. 공시월 202608 기준이에요."}]}
+{"question": "그럼 전세대출 쪽은 어때?", "intent": "loan", "tier": "boundary", "history": [{"role": "user", "content": "1년 정기예금 금리 비교해줘"}, {"role": "assistant", "content": "1위 A은행 정기예금 연 3.5%, 2위 B저축은행 e-정기예금 연 3.4%입니다. 공시월 202608 기준이에요."}]}
+{"question": "그럼 요즘 금리 높은 적금이라도 알려줘", "intent": "deposit", "tier": "boundary", "history": [{"role": "user", "content": "오늘 저녁 메뉴 좀 골라줘"}, {"role": "assistant", "content": "저는 금융상품 비교·상담만 도와드리는 챗봇이라 그 질문에는 답변드리기 어려워요."}]}
+{"question": "그럼 금융 말고 다른 얘기 좀 하자", "intent": "out_of_scope", "tier": "boundary", "history": [{"role": "user", "content": "재미있는 이야기 하나 해줘"}, {"role": "assistant", "content": "저는 금융상품 비교·상담만 도와드리는 챗봇이라 그 질문에는 답변드리기 어려워요."}]}
