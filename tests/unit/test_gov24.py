@@ -136,12 +136,21 @@ def test_이미_수집된_상품명과_겹치는_서비스는_뺀다() -> None:
     assert [r["서비스ID"] for r in kept] == ["B"]  # 공백 차이는 같은 상품으로 본다
 
 
+def test_융자형_서비스는_정책대출_카테고리로_분류한다() -> None:
+    # 카테고리로 좁혀 검색하면 다른 카테고리는 보이지 않는다 —
+    # 빌리는 성격(융자)의 혜택은 정책대출과 같은 칸에 있어야 함께 검색된다.
+    loan_doc = gov24_docs([service()])[0]  # 지원유형 "현금(융자)"
+    assert loan_doc.category == "정책대출"
+
+    grant_doc = gov24_docs([service(지원유형="현금", 서비스명="청년미래적금")])[0]
+    assert grant_doc.category == CATEGORY
+
+
 def test_문서는_지원내용과_신청정보를_담는다() -> None:
     docs = gov24_docs([service()])
     assert len(docs) == 1
     doc = docs[0]
     assert doc.product_key == "gov24:161300000076"
-    assert doc.category == CATEGORY
     assert doc.bank == "국토교통부"
     assert doc.name == "버팀목전세자금대출"
     assert doc.disclosure_month == "202605"
