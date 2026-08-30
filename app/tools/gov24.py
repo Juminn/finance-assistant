@@ -12,11 +12,14 @@ from typing import Any, cast
 import httpx
 
 from app.tools.catalog import ProductDoc
+from app.tools.smfg import CATEGORY as POLICY_LOAN_CATEGORY
 
 BASE_URL = "https://api.odcloud.kr/api/gov24/v3"
 DETAIL_URL = f"{BASE_URL}/serviceDetail"
 
-# 조건 검색 카테고리 어휘 — 대출 상품이 아닌 정책 지원·자산형성 제도를 묶는다
+# 조건 검색 카테고리 어휘 — 대출이 아닌 정책 지원·자산형성 제도를 묶는다.
+# 융자(빌리는) 성격의 혜택은 정책대출 카테고리로 분류한다: 카테고리로 좁힌
+# 검색은 다른 카테고리를 보지 못하므로, 대출은 대출끼리 한 칸에 있어야 한다.
 CATEGORY = "정책지원"
 
 _PAGE_SIZE = 500
@@ -162,8 +165,9 @@ def gov24_docs(rows: list[dict[str, Any]]) -> list[ProductDoc]:
             continue
         seen.add(key)
 
+        category = POLICY_LOAN_CATEGORY if "융자" in _text_of(row, "지원유형") else CATEGORY
         organ = _text_of(row, "소관기관명")
-        lines = [f"[{CATEGORY}] {organ} {name}".strip()]
+        lines = [f"[{category}] {organ} {name}".strip()]
         for label, field in _DOC_FIELDS:
             value = _text_of(row, field)
             if not value:
@@ -175,7 +179,7 @@ def gov24_docs(rows: list[dict[str, Any]]) -> list[ProductDoc]:
         docs.append(
             ProductDoc(
                 product_key=key,
-                category=CATEGORY,
+                category=category,
                 bank=organ[:64],
                 name=name[:200],
                 text="\n".join(lines),
