@@ -1,7 +1,12 @@
 import pytest
 
 from app.db.vector_models import ProductEmbedding
-from app.tools.condition import format_matches, infer_category
+from app.tools.condition import (
+    MIN_SIMILARITY,
+    drop_weak_matches,
+    format_matches,
+    infer_category,
+)
 
 
 def row(bank: str, distance: float, text: str = "") -> tuple[ProductEmbedding, float]:
@@ -70,3 +75,50 @@ def test_질의에_카테고리_단서가_하나면_그_카테고리로_좁힌�
 )
 def test_단서가_없거나_둘_이상이면_좁히지_않는다(query: str) -> None:
     assert infer_category(query) == ""
+
+
+def at_similarity(bank: str, similarity: float) -> tuple[ProductEmbedding, float]:
+    """유사도를 직접 지정한다 (코사인 거리 = 1 - 유사도)."""
+    return row(bank, 1.0 - similarity)
+
+
+def test_기준_미만_유사도는_버리고_기준_이상만_남긴다() -> None:
+    kept = drop_weak_matches(
+        [at_similarity("가은행", 0.8), at_similarity("나은행", 0.1)], min_similarity=0.5
+    )
+    assert [r.bank for r, _ in kept] == ["가은행"]
+
+
+def test_기준값과_같은_유사도는_남긴다() -> None:
+    kept = drop_weak_matches([at_similarity("가은행", 0.4)], min_similarity=0.4)
+    assert len(kept) == 1
+
+
+def test_거리순_정렬을_흐트러뜨리지_않는다() -> None:
+    kept = drop_weak_matches(
+        [at_similarity("가은행", 0.7), at_similarity("나은행", 0.6), at_similarity("다은행", 0.5)],
+        min_similarity=0.4,
+    )
+    assert [r.bank for r, _ in kept] == ["가은행", "나은행", "다은행"]
+
+
+def test_전부_기준_미만이면_빈_결과가_되어_못찾음_안내로_이어진다() -> None:
+    kept = drop_weak_matches(
+        [at_similarity("가은행", 0.2), at_similarity("나은행", 0.1)], min_similarity=0.5
+    )
+    assert kept == []
+    assert "찾지 못" in format_matches(kept)
+
+
+def test_기본_기준값은_실측_관련_질의_최저치를_남긴다() -> None:
+    # 실측(색인 1042건): 관련 질의 80개 결과의 최저 유사도가 0.425였다.
+    assert len(drop_weak_matches([at_similarity("가은행", 0.425)])) == 1
+
+
+def test_기본_기준값은_명백한_무관을_거른다() -> None:
+    # 실측: "오늘 날씨"·"파이썬 정렬"·"치킨 맛집" 질의의 상위 유사도가 0.20~0.33이었다.
+    assert drop_weak_matches([at_similarity("가은행", 0.33)]) == []
+
+
+def test_기본_기준값은_실측_구간_사이에_있다() -> None:
+    assert 0.33 < MIN_SIMILARITY < 0.425

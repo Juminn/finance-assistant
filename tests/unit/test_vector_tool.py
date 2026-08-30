@@ -149,3 +149,35 @@ def test_추론_결과가_신용대출이어도_그대로_검색한다(ready_bac
 def test_추론할_단서가_없으면_기존대로_전체를_검색한다(ready_backend: dict[str, Any]) -> None:
     search_products_by_condition.invoke({"query": "청년만 가입할 수 있는 상품"})
     assert ready_backend["search_kwargs"]["category"] is None
+
+
+def product(bank: str = "가은행") -> ProductEmbedding:
+    return ProductEmbedding(
+        product_key=f"deposit:{bank}:P1",
+        category="정기예금",
+        bank=bank,
+        name=f"{bank}예금",
+        text=f"[정기예금] {bank} {bank}예금\n우대조건: 첫 거래 우대",
+        content_hash="x",
+        disclosure_month="202608",
+        embedding=[0.0] * 1536,
+    )
+
+
+def test_유사도가_낮은_결과만_나오면_상품을_들이밀지_않는다(
+    ready_backend: dict[str, Any],
+) -> None:
+    # 무관한 질의도 벡터 검색은 늘 top_k건을 돌려준다 — 억지 추천을 막는 바닥
+    ready_backend["results"] = [(product(), 0.78)]  # 유사도 0.22
+    result = search_products_by_condition.invoke({"query": "치킨 맛집 추천해줘"})
+    assert "찾지 못" in result
+    assert "가은행" not in result
+
+
+def test_기준을_넘는_결과와_못_넘는_결과가_섞이면_넘는_것만_보여준다(
+    ready_backend: dict[str, Any],
+) -> None:
+    ready_backend["results"] = [(product("가은행"), 0.4), (product("나은행"), 0.8)]
+    result = search_products_by_condition.invoke({"query": "첫 거래 우대"})
+    assert "가은행" in result
+    assert "나은행" not in result

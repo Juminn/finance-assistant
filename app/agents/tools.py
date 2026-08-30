@@ -13,7 +13,7 @@ from app.core.embeddings import embed_texts
 from app.db.session import get_session_factory, vector_search_enabled
 from app.db.vector_repo import index_ready, search_similar
 from app.tools.catalog import CATEGORIES
-from app.tools.condition import format_matches, infer_category
+from app.tools.condition import drop_weak_matches, format_matches, infer_category
 from app.tools.deposit import format_deposit_products, search_deposit_products
 from app.tools.finlife import FinlifeError
 from app.tools.loan import (
@@ -166,4 +166,5 @@ def search_products_by_condition(query: str, category: str = "") -> str:
         note = f"[참고] '{requested_category}' 카테고리를 인식하지 못해 전체에서 검색했습니다.\n"
     elif inferred_category:
         note = f"[참고] 질의를 보고 '{inferred_category}' 카테고리로 좁혀 검색했습니다.\n"
-    return note + format_matches(matches)
+    # 유사도가 낮은 결과는 버린다 — 무관한 질의에도 벡터 검색은 늘 top_k건을 돌려준다
+    return note + format_matches(drop_weak_matches(matches))

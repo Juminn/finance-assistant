@@ -4,6 +4,20 @@ from app.db.vector_models import ProductEmbedding
 
 _DETAIL_LIMIT = 400
 
+# 벡터 검색은 무관한 질의에도 늘 top_k건을 돌려준다. 그대로 넘기면 LLM이
+# 상관없는 상품을 답으로 들이밀게 되므로, 명백히 먼 결과는 여기서 끊는다.
+#
+# 실측(색인 1042건, 관련 질의 16개 x 상위 5건 = 80건):
+#   관련 결과 최저 유사도        0.425
+#   도메인 밖 질의("오늘 날씨",
+#   "파이썬 정렬", "치킨 맛집")  0.20 ~ 0.33
+# 0.35는 그 사이에서 관련 결과를 하나도 잃지 않는 값이다. 더 올리면(0.45)
+# 관련 결과 80건 중 14건이 잘려나간다 — 맞는 상품을 잃는 쪽이 더 나쁘다.
+#
+# 보험·퇴직연금처럼 금융에 인접한 질의는 0.41~0.47로 관련 구간과 겹쳐서
+# 이 값으로는 못 거른다. 그쪽은 supervisor 라우팅과 워커 프롬프트가 맡는다.
+MIN_SIMILARITY = 0.35
+
 # 질의문에서 카테고리를 짚는 단서. 카테고리가 지정되지 않으면 이걸로 좁힌다.
 # 색인이 커질수록 전체 검색은 무관 카테고리에 밀리므로, 단서가 있으면 쓰는 편이 낫다.
 # "신용"·"대출"처럼 여러 카테고리에 걸치는 낱말은 오탐이 커서 단서로 쓰지 않는다.
@@ -27,6 +41,22 @@ def infer_category(query: str) -> str:
     return hits.pop() if len(hits) == 1 else ""
 
 
+def similarity(distance: float) -> float:
+    """코사인 거리(0~2)를 0~1 유사도로 바꾼다."""
+    return max(0.0, 1.0 - distance)
+
+
+def drop_weak_matches(
+    matches: list[tuple[ProductEmbedding, float]],
+    min_similarity: float = MIN_SIMILARITY,
+) -> list[tuple[ProductEmbedding, float]]:
+    """유사도가 기준에 못 미치는 결과를 버린다. 남은 것의 순서는 그대로 둔다.
+
+    전부 걸러지면 빈 목록이 되고, format_matches가 "찾지 못했습니다"를 반환한다.
+    """
+    return [match for match in matches if similarity(match[1]) >= min_similarity]
+
+
 def format_matches(matches: list[tuple[ProductEmbedding, float]]) -> str:
     """(문서, 코사인 거리) 목록을 LLM이 인용하기 좋은 텍스트로 만든다."""
     if not matches:
@@ -34,10 +64,9 @@ def format_matches(matches: list[tuple[ProductEmbedding, float]]) -> str:
 
     lines = ["조건과 가장 가까운 상품:"]
     for rank, (row, distance) in enumerate(matches, start=1):
-        similarity = max(0.0, 1.0 - distance)  # 코사인 거리는 0~2 — 음수 유사도 방지
         lines.append(
             f"{rank}. [{row.category}] {row.bank} {row.name}"
-            f" (유사도 {similarity:.2f}, 공시월 {row.disclosure_month})"
+            f" (유사도 {similarity(distance):.2f}, 공시월 {row.disclosure_month})"
         )
         detail = " / ".join(row.text.splitlines()[1:])
         if len(detail) > _DETAIL_LIMIT:
