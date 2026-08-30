@@ -6,12 +6,28 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine
+from starlette.responses import Response
+from starlette.types import Scope
 
 from app.api import chat
 from app.db.base import Base
 from app.db.session import get_engine, get_session_factory, set_engine
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
+
+
+class _RevalidatingStaticFiles(StaticFiles):
+    """정적 자산을 쓰기 전에 반드시 서버에 물어보게 한다.
+
+    web/은 index.html·app.js·styles.css로 나뉘어 있어서, 브라우저가 파일마다
+    따로 캐시하면 새 HTML과 낡은 JS가 섞인 상태로 굳는다. no-cache는 캐시를
+    막는 것이 아니라 재검증을 강제하는 값이라, 바뀐 게 없으면 304로 끝난다.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def create_app(engine: Engine | None = None) -> FastAPI:
@@ -32,7 +48,7 @@ def create_app(engine: Engine | None = None) -> FastAPI:
     app = FastAPI(title="금융 통합 비서", lifespan=lifespan)
     app.include_router(chat.router, prefix="/api")
     if _WEB_DIR.exists():
-        app.mount("/", StaticFiles(directory=_WEB_DIR, html=True), name="web")
+        app.mount("/", _RevalidatingStaticFiles(directory=_WEB_DIR, html=True), name="web")
     return app
 
 
