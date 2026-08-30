@@ -467,11 +467,12 @@ formEl.addEventListener("submit", (e) => {
   send(text);
 });
 
-// 웰컴 예시 칩과 후속 질문 칩은 누르는 즉시 그 문장을 보낸다
+// 웰컴 예시 칩과 후속 질문 칩은 누르는 즉시 그 문장을 보낸다.
+// 웰컴 칩은 라벨이 짧아서 보낼 문장을 data-q에 따로 담는다.
 messagesEl.addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
   if (!chip || pending) return;
-  send(chip.textContent);
+  send(chip.dataset.q || chip.textContent);
 });
 
 newChatBtn.addEventListener("click", () => {
