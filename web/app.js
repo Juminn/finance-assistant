@@ -36,6 +36,11 @@ let sessionId = null;
 let pending = false;
 // 실패한 요청을 다시 보내기 위해 원문을 들고 있는다 (재타이핑을 시키지 않는다).
 let lastRequestText = null;
+// "새 대화"를 누르면 올라간다. 그 전에 보낸 요청의 응답이 늦게 도착해도
+// 새 대화에 끼어들지 못하게 하는 표식이다 — 특히 옛 session_id를 되살리면 안 된다.
+let conversationEpoch = 0;
+// 진행 중인 요청. 새 대화를 시작할 때 끊는다.
+let activeController = null;
 
 /* ---------------- 마크다운 렌더링 ----------------
    LLM 답변은 신뢰할 수 없는 문자열로 다룬다. innerHTML을 쓰지 않고
@@ -111,7 +116,12 @@ function renderTable(lines, start, root) {
   return i;
 }
 
+function indentOf(line) {
+  return /^[ \t]*/.exec(line)[0].replace(/\t/g, "    ").length;
+}
+
 function renderList(lines, start, root) {
+  const baseIndent = indentOf(lines[start]);
   const ordered = RE_OL.test(lines[start]);
   const list = document.createElement(ordered ? "ol" : "ul");
   if (ordered) {
@@ -119,21 +129,47 @@ function renderList(lines, start, root) {
     if (first > 1) list.start = first;
   }
 
+  const sameKind = (line) => (ordered ? RE_OL : RE_UL).test(line);
+  const anyItem = (line) => RE_OL.test(line) || RE_UL.test(line);
+
   let i = start;
   let item = null;
   while (i < lines.length) {
-    const m = ordered ? RE_OL.exec(lines[i]) : RE_UL.exec(lines[i]);
-    if (m) {
+    const line = lines[i];
+    const indent = indentOf(line);
+
+    // 같은 깊이의 같은 종류 항목
+    if (sameKind(line) && indent <= baseIndent) {
       item = document.createElement("li");
-      renderInline(m[1], item);
+      renderInline((ordered ? RE_OL : RE_UL).exec(line)[1], item);
       list.appendChild(item);
       i++;
       continue;
     }
+    // 더 깊이 들여쓴 목록은 직전 항목 안에 중첩한다. 이걸 빼면 항목마다
+    // 목록이 끊겨 "1개짜리 목록"이 줄줄이 생긴다 (정책대출 답변이 이 형태다).
+    if (item && anyItem(line) && indent > baseIndent) {
+      i = renderList(lines, i, item);
+      continue;
+    }
+    // 항목 사이를 빈 줄로 띄운 목록(loose list)도 하나의 목록으로 잇는다
+    if (!line.trim()) {
+      let next = i;
+      while (next < lines.length && !lines[next].trim()) next++;
+      const continues =
+        next < lines.length &&
+        ((sameKind(lines[next]) && indentOf(lines[next]) <= baseIndent) ||
+          (item && anyItem(lines[next]) && indentOf(lines[next]) > baseIndent));
+      if (continues) {
+        i = next;
+        continue;
+      }
+      break;
+    }
     // 항목 아래 들여쓴 설명 줄은 직전 항목에 이어 붙인다
-    if (item && lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && !isBlockStart(lines[i])) {
+    if (item && indent > baseIndent && !isBlockStart(line)) {
       item.appendChild(document.createElement("br"));
-      renderInline(lines[i].trim(), item);
+      renderInline(line.trim(), item);
       i++;
       continue;
     }
@@ -273,8 +309,9 @@ function addFollowupChips(turn, msg) {
 
   const list = msg.querySelector("ol");
   if (!list) return;
+  // 상위 5~6건을 추리는 답변이 흔하므로 6까지 받는다. 그보다 길면 칩이 화면을 덮는다.
   const count = list.children.length;
-  if (count < 2 || count > 5) return;
+  if (count < 2 || count > 6) return;
 
   const chips = document.createElement("div");
   chips.className = "chips followup";
@@ -380,6 +417,7 @@ async function send(text, { echo = true } = {}) {
   pending = true;
   sendBtn.disabled = true;
   lastRequestText = text;
+  const epoch = conversationEpoch;
 
   clearWelcome();
   if (echo) addUserTurn(text);
@@ -388,6 +426,7 @@ async function send(text, { echo = true } = {}) {
   const { turn, timers } = addTypingTurn();
 
   const controller = new AbortController();
+  activeController = controller;
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -396,19 +435,27 @@ async function send(text, { echo = true } = {}) {
 
   try {
     const data = await postChat(text, controller.signal);
+    // 새 대화가 시작됐다면 이 응답은 버린 대화의 것이다. 화면에도 세션에도 반영하지 않는다.
+    if (epoch !== conversationEpoch) return;
     sessionId = data.session_id;
     fillAssistantTurn(turn, data.reply);
   } catch (err) {
+    if (epoch !== conversationEpoch) return;
     fillErrorTurn(turn, describeFailure(err, timedOut));
   } finally {
     clearTimeout(timeout);
     for (const t of timers) clearTimeout(t);
-    pending = false;
-    sendBtn.disabled = false;
-    // 기다리는 동안 위로 올라가 읽고 있었다면 화면을 끌어내리지 않고 버튼만 띄운다
-    if (isAtBottom()) scrollToBottom();
-    else scrollBtn.hidden = false;
-    inputEl.focus();
+    if (activeController === controller) activeController = null;
+    // 새 대화가 이미 상태를 초기화했고 그 뒤 다른 요청이 시작됐을 수 있다.
+    // 그 요청의 pending을 여기서 풀어버리면 전송이 겹친다.
+    if (epoch === conversationEpoch) {
+      pending = false;
+      sendBtn.disabled = false;
+      // 기다리는 동안 위로 올라가 읽고 있었다면 화면을 끌어내리지 않고 버튼만 띄운다
+      if (isAtBottom()) scrollToBottom();
+      else scrollBtn.hidden = false;
+      inputEl.focus();
+    }
   }
 }
 
@@ -428,6 +475,16 @@ messagesEl.addEventListener("click", (e) => {
 });
 
 newChatBtn.addEventListener("click", () => {
+  // 진행 중인 요청을 끊고 잠금을 푼다. 이걸 빼면 pending이 true로 남아
+  // 다음 전송이 통째로 막히고, 늦게 온 응답이 옛 session_id를 되살린다.
+  conversationEpoch++;
+  if (activeController) {
+    activeController.abort();
+    activeController = null;
+  }
+  pending = false;
+  sendBtn.disabled = false;
+
   sessionId = null;
   lastRequestText = null;
   messagesEl.replaceChildren();
