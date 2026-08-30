@@ -4,6 +4,7 @@
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
 # pyright: reportUnknownArgumentType=false
 
+import logging
 from collections.abc import Sequence
 from functools import lru_cache, partial
 from typing import Any, Literal
@@ -101,12 +102,25 @@ def _chat_model() -> ChatOpenAI:
 
 
 def supervisor(state: AgentState) -> dict[str, Any]:
-    decision = (
-        _chat_model()
-        .with_structured_output(IntentDecision)
-        .invoke([SystemMessage(SUPERVISOR_SYSTEM), *history_for_llm(state["messages"])])
-    )
-    assert isinstance(decision, IntentDecision)
+    """마지막 사용자 메시지의 의도를 분류한다. 실패하면 general로 폴백한다.
+
+    분류는 답변을 보조하는 단계라 여기서 죽으면 요청 전체가 502로 번진다 —
+    route_by_intent가 미지 intent를 general로 보내는 것과 같은 철학이다.
+    (API 장애처럼 general 호출도 함께 죽는 실패는 거기서 502가 되고,
+    모델 거절·파싱 실패 같은 분류만의 실패는 대화가 이어진다.)
+    """
+    try:
+        decision = (
+            _chat_model()
+            .with_structured_output(IntentDecision)
+            .invoke([SystemMessage(SUPERVISOR_SYSTEM), *history_for_llm(state["messages"])])
+        )
+    except Exception:
+        logging.exception("의도분류 실패 — general로 폴백")
+        return {"intent": "general"}
+    if not isinstance(decision, IntentDecision):
+        logging.warning("의도분류 결과가 IntentDecision이 아님 (%r) — general로 폴백", decision)
+        return {"intent": "general"}
     return {"intent": decision.intent}
 
 
