@@ -123,6 +123,16 @@ def test_거절_문구는_대신_할_수_있는_일을_안내한다() -> None:
     assert "대출" in OUT_OF_SCOPE_REPLY
 
 
+def test_general_프롬프트는_조회_불가_상품의_추천을_막는다() -> None:
+    # 보험·연금저축처럼 조회할 수 없는 상품을 고르려는 질문도 general로 온다.
+    # 도구 없는 워커가 학습 지식으로 특정 상품을 답하면 "도구 결과만 사용"
+    # 원칙이 이 경로에서만 뚫린다 — '투자 권유 금지'로는 보험사 추천이 안 막힌다.
+    from app.agents.prompts import GENERAL_AGENT_SYSTEM
+
+    assert "연금저축" in GENERAL_AGENT_SYSTEM
+    assert "추천하지 않는다" in GENERAL_AGENT_SYSTEM
+
+
 def test_챗_모델은_프로세스당_한_번만_만든다() -> None:
     # 생성 시점에 sync·async httpx 클라이언트를 즉시 만들므로, supervisor처럼
     # 모든 요청이 지나는 경로에서 매번 새로 만들면 커넥션 풀이 그대로 버려진다
