@@ -1,4 +1,4 @@
-from app.db.base import is_postgres, normalize_db_url
+from app.db.base import is_postgres, normalize_db_url, to_psycopg_conninfo
 
 
 def test_neon이_주는_postgresql_주소를_psycopg_드라이버로_바꾼다() -> None:
@@ -35,3 +35,17 @@ def test_postgres_여부를_판별한다() -> None:
     assert is_postgres("postgres://u:p@host/db") is True
     assert is_postgres("postgresql+psycopg://u:p@host/db") is True
     assert is_postgres("sqlite:///./data/app.db") is False
+
+
+def test_psycopg_직결용_conninfo는_드라이버_표기를_뗀다() -> None:
+    # psycopg.connect는 SQLAlchemy의 +드라이버 스킴을 모른다
+    assert (
+        to_psycopg_conninfo("postgresql+psycopg://user:pw@ep-x.aws.neon.tech/db?sslmode=require")
+        == "postgresql://user:pw@ep-x.aws.neon.tech/db?sslmode=require"
+    )
+    assert to_psycopg_conninfo("postgres://u:p@host/db") == "postgresql://u:p@host/db"
+    assert to_psycopg_conninfo("postgresql://u:p@host/db") == "postgresql://u:p@host/db"
+
+
+def test_psycopg_conninfo_변환은_postgres가_아니면_그대로_둔다() -> None:
+    assert to_psycopg_conninfo("sqlite:///./data/app.db") == "sqlite:///./data/app.db"
