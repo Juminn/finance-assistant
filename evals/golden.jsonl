@@ -105,5 +105,4 @@
 {"question": "금융권 취업하려면 뭘 준비해야 해?", "intent": "out_of_scope", "tier": "boundary"}
 {"question": "'예금'으로 삼행시 지어줘", "intent": "out_of_scope", "tier": "boundary"}
 {"question": "심심한데 아무 얘기나 하자", "intent": "out_of_scope", "tier": "boundary"}
-{"question": "너 무슨 AI 모델로 만들어졌어?", "intent": "general", "tier": "boundary"}
 {"question": "이 챗봇으로 뭘 물어볼 수 있는지 예시 좀 줘", "intent": "general", "tier": "boundary"}
