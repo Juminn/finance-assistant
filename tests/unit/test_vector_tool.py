@@ -146,6 +146,16 @@ def test_추론_결과가_신용대출이어도_그대로_검색한다(ready_bac
     assert ready_backend["search_kwargs"]["category"] == "개인신용대출"
 
 
+def test_정책대출_카테고리를_지정하면_그대로_검색한다(ready_backend: dict[str, Any]) -> None:
+    search_products_by_condition.invoke({"query": "청년 전세 지원", "category": "정책대출"})
+    assert ready_backend["search_kwargs"]["category"] == "정책대출"
+
+
+def test_정책상품_질의는_정책_카테고리로_좁혀진다(ready_backend: dict[str, Any]) -> None:
+    search_products_by_condition.invoke({"query": "햇살론 받을 수 있는 조건"})
+    assert ready_backend["search_kwargs"]["category"] == "정책대출"
+
+
 def test_추론할_단서가_없으면_기존대로_전체를_검색한다(ready_backend: dict[str, Any]) -> None:
     search_products_by_condition.invoke({"query": "청년만 가입할 수 있는 상품"})
     assert ready_backend["search_kwargs"]["category"] is None
