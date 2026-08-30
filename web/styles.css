@@ -1,0 +1,337 @@
+/* 금융 통합 비서 — 화면 스타일.
+   색은 :root(라이트)에 토큰으로 전부 정의하고, 다크는 같은 토큰만 덮어쓴다.
+   컴포넌트 규칙에는 색 리터럴을 쓰지 않는다 — 한쪽 테마만 고쳐지는 일을 막는다. */
+
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --ink: #1c2733;
+  --sub: #6b7a8c;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --accent-soft: #eef4ff;
+  --line: #e3e8ef;
+  --line-strong: #cbd5e1;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --danger-line: #fecdca;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --radius: 12px;
+  --font: "Pretendard", "Segoe UI", "Malgun Gothic", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: "SFMono-Regular", "Consolas", "D2Coding", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f151c;
+    --surface: #18212b;
+    --surface-2: #1f2a36;
+    --ink: #e7edf4;
+    --sub: #9aa9ba;
+    --accent: #4b83f0;
+    --accent-ink: #0b1118;
+    --accent-soft: #1b2a42;
+    --line: #2a3644;
+    --line-strong: #3a4859;
+    --danger: #ff9c92;
+    --danger-soft: #2a1a1a;
+    --danger-line: #5c2f2c;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  font-family: var(--font);
+  /* 금리·한도 숫자가 자리마다 어긋나 보이지 않게 고정폭 숫자를 쓴다 */
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---------- 헤더 ---------- */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+.brand-sub { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  min-height: 44px;
+}
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.55; cursor: default; }
+
+button.ghost {
+  background: transparent;
+  color: var(--sub);
+  border: 1px solid var(--line-strong);
+  padding: 8px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+button.ghost:hover { color: var(--ink); background: var(--surface-2); }
+
+/* ---------- 대화 영역 ---------- */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* min-width: 0 이 없으면 플렉스 항목이 min-content(= 넓은 비교표) 아래로 줄지 않아
+   말풍선이 화면 밖으로 삐져나간다. max-width와 짝으로 반드시 함께 둔다. */
+.turn { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.turn.user { align-self: flex-end; align-items: flex-end; max-width: 80%; }
+.turn.assistant { align-self: flex-start; align-items: flex-start; max-width: 92%; }
+
+.msg {
+  max-width: 100%;
+  min-width: 0;
+  padding: 12px 15px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  animation: rise 0.18s ease-out;
+}
+.turn.user .msg {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-bottom-right-radius: 4px;
+  white-space: pre-wrap;
+}
+.turn.assistant .msg {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--shadow);
+}
+.turn.error .msg {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+  color: var(--danger);
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* 답변 끝의 유의문구를 본문에서 떼어 붙이는 캡션 */
+.note {
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.5;
+  padding: 0 4px;
+  max-width: 60ch;
+}
+
+/* ---------- 답변 안의 마크다운 ---------- */
+.msg > *:first-child { margin-top: 0; }
+.msg > *:last-child { margin-bottom: 0; }
+.msg p { margin: 0 0 8px; }
+.msg h3 { font-size: 15px; font-weight: 650; margin: 14px 0 6px; }
+.msg ul, .msg ol { margin: 0 0 8px; padding-left: 20px; }
+.msg li { margin-bottom: 4px; }
+.msg li::marker { color: var(--sub); }
+.msg strong { font-weight: 650; }
+.msg code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* 비교표는 말풍선을 넓히지 않고 표 안에서 가로로 스크롤한다 */
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 0 0 8px; -webkit-overflow-scrolling: touch; }
+.msg table { border-collapse: collapse; font-size: 13.5px; width: max-content; min-width: 100%; }
+.msg th, .msg td {
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.msg th { background: var(--surface-2); font-weight: 650; }
+
+/* ---------- 웰컴 ---------- */
+.welcome { display: flex; flex-direction: column; gap: 14px; padding: 8px 2px 4px; }
+.welcome h2 { font-size: 20px; font-weight: 680; letter-spacing: -0.02em; }
+.welcome-lead { font-size: 14px; color: var(--sub); line-height: 1.6; margin-top: -6px; }
+
+.cards {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.cards li {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.card-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+.cards p { font-size: 13px; color: var(--sub); line-height: 1.55; }
+.cards b { color: var(--ink); font-weight: 650; }
+
+.chips-label { font-size: 13px; color: var(--sub); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  min-height: 40px;
+  text-align: left;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+.scope {
+  font-size: 12.5px;
+  color: var(--sub);
+  line-height: 1.55;
+  border-left: 2px solid var(--line-strong);
+  padding-left: 10px;
+}
+
+/* 답변에 딸리는 후속 질문 칩 */
+.followup { padding: 0 2px; }
+.followup .chip { font-size: 12.5px; padding: 6px 12px; min-height: 34px; }
+
+/* ---------- 생각 중 표시 ---------- */
+.typing { display: flex; align-items: center; gap: 10px; }
+.dots { display: inline-flex; gap: 4px; }
+.dots i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--sub);
+  animation: blink 1.2s infinite ease-in-out;
+}
+.dots i:nth-child(2) { animation-delay: 0.2s; }
+.dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+.stage { font-size: 13px; color: var(--sub); }
+
+@media (prefers-reduced-motion: reduce) {
+  .msg { animation: none; }
+  .dots i { animation: none; opacity: 0.55; }
+}
+
+/* ---------- 다시 시도 ---------- */
+.retry {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
+  font-size: 13px;
+  padding: 7px 13px;
+  min-height: 38px;
+  margin-top: 8px;
+}
+
+/* ---------- 최신 답변으로 이동 ---------- */
+#scroll-bottom {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 5;
+  font-size: 13px;
+  padding: 8px 16px;
+  min-height: 38px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+
+/* ---------- 입력 ---------- */
+footer {
+  padding: 10px 20px calc(14px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+form { display: flex; gap: 8px; max-width: 780px; margin: 0 auto; }
+form input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  /* iOS는 16px 미만 입력창에 포커스가 가면 화면을 확대한다 — 16px 아래로 내리지 말 것 */
+  font-size: 16px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 44px;
+}
+form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+form input::placeholder { color: var(--sub); }
+
+.legal {
+  max-width: 780px;
+  margin: 8px auto 0;
+  font-size: 11.5px;
+  color: var(--sub);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- 모바일 ---------- */
+@media (max-width: 600px) {
+  header { padding: 10px 14px; }
+  #messages { padding: 14px 14px 8px; gap: 12px; }
+  footer { padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); }
+  .turn.user, .turn.assistant { max-width: 100%; }
+  /* 카드가 세로로 쌓이면 예시 칩이 접힘 아래로 밀린다. 좁은 화면에서는
+     바로 눌러볼 수 있는 칩을 카드보다 위로 올린다. */
+  .welcome { gap: 10px; }
+  .welcome h2 { order: 1; font-size: 18px; }
+  .welcome-lead { order: 2; }
+  .chips-label { order: 3; }
+  .chips { order: 4; }
+  .cards { order: 5; grid-template-columns: 1fr; gap: 8px; }
+  .cards li { padding: 10px 12px; }
+  .scope { order: 6; }
+  .msg th, .msg td { padding: 6px 8px; }
+}
