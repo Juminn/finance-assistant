@@ -121,3 +121,27 @@ def test_관련_질의는_유사도_기준을_통과한다() -> None:
             kept = drop_weak_matches(matches)
             sims = [round(1 - d, 3) for _, d in matches]
             assert len(kept) == len(matches), f"{query!r}의 결과가 잘렸다 (유사도 {sims})"
+
+
+def test_청년_적금_질의에_정책_적금이_함께_잡힌다() -> None:
+    """정책 예·적금 재분류의 회귀 감시 — 상품명을 대지 않은 대상 계층 질의에서
+    적금으로 좁혀 검색해도 정책 상품(보조금24 출처)이 도구의 top_k 안에 들어야 한다."""
+    settings = get_settings()
+    if not is_postgres(settings.database_url) or not settings.openai_api_key:
+        pytest.skip("Neon DATABASE_URL과 OPENAI_API_KEY 필요")
+
+    engine = get_engine()
+    ensure_vector_schema(engine)
+    client = OpenAI(api_key=settings.openai_api_key)
+
+    with Session(engine) as db:
+        if not existing_hashes(db):
+            pytest.skip("색인이 비어 있음")
+        query = "청년이 금리 좋게 받을 수 있는 적금 알려줘"
+        assert infer_category(query) == "적금"
+        vector = embed_texts(client, [query])[0]
+        matches = search_similar(db, vector, top_k=10, category="적금")  # 도구와 같은 top_k
+        kept = drop_weak_matches(matches)
+        assert any(row.product_key.startswith("gov24:") for row, _ in kept), (
+            f"정책 적금이 잘렸다: {[(row.bank, row.name) for row, _ in kept]}"
+        )

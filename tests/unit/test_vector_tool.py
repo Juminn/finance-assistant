@@ -77,6 +77,13 @@ def test_전체_검색은_어떤_카테고리도_제외하지_않는다(ready_ba
     assert ready_backend["search_kwargs"]["category"] is None
 
 
+def test_상위_10건을_검색한다(ready_backend: dict[str, Any]) -> None:
+    # 정책 상품이 공시 상품과 한 카테고리에 섞이면서 풀이 커졌다 — 5건이면
+    # 정책 적금이 지자체 통장·시중 적금에 밀려 잘린다 (실측: 청년미래적금 9위)
+    search_products_by_condition.invoke({"query": "청년 우대 적금"})
+    assert ready_backend["search_kwargs"]["top_k"] == 10
+
+
 def test_색인이_비어있으면_미준비_안내를_한다(
     ready_backend: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
