@@ -3,9 +3,12 @@
 예금·적금·주택담보대출·전세자금대출·개인신용대출 등 여러 금융상품을 한곳에서 비교하고
 상담해주는 LLM 에이전트 챗봇입니다.
 
-- **데이터**: 금융감독원 금융상품통합비교공시 오픈API (finlife.fss.or.kr)
+- **데이터**: 금융감독원 금융상품통합비교공시 오픈API (finlife.fss.or.kr) +
+  정책금융상품 공공데이터 — 서민금융상품기본정보(금융위, 햇살론·디딤돌·버팀목 등
+  정책대출 325종), 기금e든든 CSV(주택도시기금 구간별 금리·우대조건),
+  대한민국 공공서비스 혜택 API(보조금24 — 청년미래적금·자산형성 등 금융성 지원 559종)
 - **에이전트**: LangGraph 멀티 에이전트 — supervisor(의도분류) + 상품군별 worker
-- **검색**: 금리·기간은 API 실시간 조회, 우대조건·가입대상은 pgvector 시맨틱 검색(RAG)
+- **검색**: 금리·기간은 API 실시간 조회, 우대조건·가입대상·정책상품은 pgvector 시맨틱 검색(RAG)
 - **서빙**: FastAPI + 웹 채팅 UI, 대화이력 저장, 응답 PII 마스킹 (로그인 없음)
 
 ## 실행 방법
@@ -15,7 +18,8 @@
 uv sync
 
 # 2. 환경변수 설정 — .env.example을 복사해 키를 채운다
-#    OPENAI_API_KEY / FINLIFE_API_KEY / DATABASE_URL (선택: LANGSMITH_* 트레이싱)
+#    OPENAI_API_KEY / FINLIFE_API_KEY / DATA_GO_KR_API_KEY / DATABASE_URL
+#    (선택: LANGSMITH_* 트레이싱)
 cp .env.example .env
 
 # 3. 상품 카탈로그를 벡터 저장소에 색인 (조건 검색 기능용, 최초 1회 + 월 1회)

@@ -3,7 +3,9 @@
 ## 프로젝트
 예금·적금·대출 등 여러 금융상품을 한 챗봇에서 비교·상담하는 LLM 에이전트.
 스택: Python 3.12 / uv / LangGraph / OpenAI / FastAPI / PostgreSQL+pgvector(SQLAlchemy) / 정적 웹 UI.
-데이터 소스: 금융감독원 금융상품통합비교공시 오픈API (finlife.fss.or.kr).
+데이터 소스: 금융감독원 금융상품통합비교공시 오픈API (finlife.fss.or.kr) +
+정책금융상품 공공데이터(서민금융상품기본정보 API·기금e든든 CSV·보조금24 API,
+`app/tools/smfg.py`·`gigeum.py`·`gov24.py` — data.go.kr 키는 `DATA_GO_KR_API_KEY`).
 
 정형 조건(금리·기간)은 API를 실시간 호출하는 비교 도구가, 문장으로 된 조건(우대조건·가입대상)은
 배치로 색인한 pgvector 시맨틱 검색이 담당한다. `DATABASE_URL`이 PostgreSQL이 아니면
