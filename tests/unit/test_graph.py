@@ -69,6 +69,42 @@ def test_supervisor는_범위_밖_의도도_기록한다(monkeypatch: Any) -> No
     assert supervisor(make_state()) == {"intent": "out_of_scope"}
 
 
+class ExplodingModel:
+    """호출 시점에 실패하는 모델 — API 장애·타임아웃을 흉내 낸다."""
+
+    def with_structured_output(self, _schema: Any) -> "ExplodingModel":
+        return self
+
+    def invoke(self, _messages: Any) -> Any:
+        raise RuntimeError("LLM down")
+
+
+class NoneModel:
+    """구조화 출력 파싱이 결과를 못 만든 경우를 흉내 낸다."""
+
+    def with_structured_output(self, _schema: Any) -> "NoneModel":
+        return self
+
+    def invoke(self, _messages: Any) -> Any:
+        return None
+
+
+def test_분류_호출이_실패하면_general로_폴백한다(monkeypatch: Any) -> None:
+    # 분류는 답변을 보조하는 단계다 — 여기서 죽으면 요청 전체가 502로 번진다.
+    # route_by_intent가 미지 intent를 general로 보내는 것과 같은 철학으로 막는다.
+    import app.agents.graph as graph_module
+
+    monkeypatch.setattr(graph_module, "_chat_model", lambda: ExplodingModel())
+    assert supervisor(make_state()) == {"intent": "general"}
+
+
+def test_분류_결과가_형식에_맞지_않으면_general로_폴백한다(monkeypatch: Any) -> None:
+    import app.agents.graph as graph_module
+
+    monkeypatch.setattr(graph_module, "_chat_model", lambda: NoneModel())
+    assert supervisor(make_state()) == {"intent": "general"}
+
+
 def test_범위_밖_질문은_LLM을_태우지_않고_고정_문구로_거절한다(monkeypatch: Any) -> None:
     import app.agents.graph as graph_module
 
