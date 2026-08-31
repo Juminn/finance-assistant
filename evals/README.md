@@ -1,6 +1,6 @@
 # 의도분류 골든셋
 
-`golden.jsonl`은 supervisor가 질문을 `deposit` / `loan` / `general` /
+`golden.jsonl`은 router가 질문을 `deposit` / `loan` / `general` /
 `out_of_scope` 중 어디로 보내야 하는지를 정한 정답지다.
 
 ## 라벨링 규칙
@@ -53,7 +53,7 @@
 
 `history` 필드에 직전 대화(`[{"role": "user"|"assistant", "content": ...}]`)를 주면
 그 이력을 붙인 채로 마지막 질문(`question`)의 분류를 채점한다.
-supervisor 프롬프트가 약속하는 맥락 라우팅("두 번째 거 자세히" → `deposit`)은
+router 프롬프트가 약속하는 맥락 라우팅("두 번째 거 자세히" → `deposit`)은
 단일턴 문항으로는 회귀를 잡을 수 없어서 두는 필드다. 라벨은 단일턴과 같은
 규칙으로 정하되, **이력까지 읽은 사람에게 정답이 명확한 문항만** 넣는다.
 

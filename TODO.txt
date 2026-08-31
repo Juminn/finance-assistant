@@ -11,7 +11,7 @@
 - 개발 규칙: 결정적 코드는 TDD, LLM 동작은 골든셋 eval (CLAUDE.md)
 
 [에이전트]
-- LangGraph 멀티 에이전트: supervisor(의도분류: deposit/loan/general/out_of_scope)
+- LangGraph 라우팅 그래프: router(의도분류: deposit/loan/general/out_of_scope)
   → 상품군별 worker
 - 도구 6종: 정기예금·적금 비교, 주담대·전세·개인신용대출 비교, 조건 시맨틱 검색
 - 멀티턴 대화(체크포인터), 프롬프트 상수화(prompts.py), 금융상품 유의문구 강제

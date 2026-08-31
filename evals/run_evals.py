@@ -116,7 +116,7 @@ def load_golden(path: Path = _GOLDEN_PATH) -> list[EvalRecord]:
 
 
 def to_messages(history: list[dict[str, str]]) -> "list[AnyMessage]":
-    """골든셋 history를 supervisor가 받는 대화 메시지 목록으로 바꾼다."""
+    """골든셋 history를 router가 받는 대화 메시지 목록으로 바꾼다."""
     from langchain_core.messages import AIMessage, HumanMessage
 
     return [
@@ -131,10 +131,10 @@ def evaluate(records: list[EvalRecord], classify: Callable[[EvalRecord], str]) -
 def _classify_with_llm(record: EvalRecord) -> str:
     from langchain_core.messages import HumanMessage
 
-    from app.agents.graph import supervisor
+    from app.agents.graph import router
 
     messages = [*to_messages(record.history), HumanMessage(record.question)]
-    update = supervisor({"messages": messages, "intent": "general"})
+    update = router({"messages": messages, "intent": "general"})
     return str(update["intent"])
 
 
