@@ -1,4 +1,4 @@
-"""LangGraph 멀티 에이전트 그래프 — supervisor(의도분류) + 상품군별 worker."""
+"""LangGraph 라우팅 그래프 — router(의도분류) + 상품군별 worker."""
 
 # langgraph/langchain의 제네릭이 부분적으로 Unknown이라 파일 단위로만 완화한다
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
@@ -22,7 +22,7 @@ from app.agents.prompts import (
     GENERAL_AGENT_SYSTEM,
     LOAN_AGENT_SYSTEM,
     OUT_OF_SCOPE_REPLY,
-    SUPERVISOR_SYSTEM,
+    ROUTER_SYSTEM,
 )
 from app.agents.tools import (
     compare_credit_loans,
@@ -66,7 +66,7 @@ def history_for_llm(messages: Sequence[AnyMessage]) -> list[AnyMessage]:
     """모델 입력용 대화 뷰 — 사람·AI 텍스트만 최근 HISTORY_WINDOW개 남긴다.
 
     도구 호출·결과 메시지는 걸러낸다. 워커의 도구 왕복이 이력에 실리면
-    (1) 분류용 supervisor 입력에까지 상품표 전문이 매 턴 들어가고,
+    (1) 분류용 router 입력에까지 상품표 전문이 매 턴 들어가고,
     (2) 다른 워커가 자기에게 바인딩되지 않은 도구를 이력에서 보고 흉내 내며,
     (3) tool_calls와 ToolMessage 짝이 잘리면 OpenAI가 400을 반환한다.
     본문과 tool_calls가 함께 있는 AIMessage는 본문만 남긴다.
@@ -95,7 +95,7 @@ def run_worker(agent: Any, state: AgentState) -> dict[str, Any]:
 @lru_cache
 def _chat_model() -> ChatOpenAI:
     """프로세스당 하나만 만든다 — 생성 시 sync·async httpx 클라이언트가 즉시 생기므로
-    supervisor처럼 모든 요청이 지나는 경로에서 매번 만들면 커넥션 풀이 버려진다."""
+    router처럼 모든 요청이 지나는 경로에서 매번 만들면 커넥션 풀이 버려진다."""
     settings = get_settings()
     # 키가 없어도 그래프 구축은 가능해야 한다 (실 호출 시점에만 실패)
     return ChatOpenAI(
@@ -104,7 +104,7 @@ def _chat_model() -> ChatOpenAI:
     )
 
 
-def supervisor(state: AgentState) -> dict[str, Any]:
+def router(state: AgentState) -> dict[str, Any]:
     """마지막 사용자 메시지의 의도를 분류한다. 실패하면 general로 폴백한다.
 
     분류는 답변을 보조하는 단계라 여기서 죽으면 요청 전체가 502로 번진다 —
@@ -116,7 +116,7 @@ def supervisor(state: AgentState) -> dict[str, Any]:
         decision = (
             _chat_model()
             .with_structured_output(IntentDecision)
-            .invoke([SystemMessage(SUPERVISOR_SYSTEM), *history_for_llm(state["messages"])])
+            .invoke([SystemMessage(ROUTER_SYSTEM), *history_for_llm(state["messages"])])
         )
     except Exception:
         logging.exception("의도분류 실패 — general로 폴백")
@@ -146,7 +146,7 @@ def out_of_scope(state: AgentState) -> dict[str, Any]:
 
     이유는 결정성이다 — 프롬프트로만 막으면 대화를 이어가며 설득당할 여지가
     남지만, 라우팅에서 끊은 거절은 말로 뒤집을 수 없다.
-    분류용 supervisor 호출은 어차피 도므로 토큰이 공짜가 되지는 않고,
+    분류용 router 호출은 어차피 도므로 토큰이 공짜가 되지는 않고,
     답변 생성 호출 한 번(측정값 in 233 / out 427)을 아끼는 것이다.
     """
     return {"messages": [AIMessage(OUT_OF_SCOPE_REPLY)]}
@@ -176,14 +176,14 @@ def build_graph(
     )
 
     builder = StateGraph(AgentState)
-    builder.add_node("supervisor", supervisor)
+    builder.add_node("router", router)
     builder.add_node("deposit", partial(run_worker, deposit_agent))
     builder.add_node("loan", partial(run_worker, loan_agent))
     builder.add_node("general", general)
     builder.add_node("out_of_scope", out_of_scope)
-    builder.add_edge(START, "supervisor")
+    builder.add_edge(START, "router")
     builder.add_conditional_edges(
-        "supervisor", route_by_intent, ["deposit", "loan", "general", "out_of_scope"]
+        "router", route_by_intent, ["deposit", "loan", "general", "out_of_scope"]
     )
     builder.add_edge("deposit", END)
     builder.add_edge("loan", END)

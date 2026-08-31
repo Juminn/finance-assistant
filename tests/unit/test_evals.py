@@ -27,7 +27,7 @@ def test_골든셋에_중복_문항이_없다() -> None:
 
 
 def test_골든셋에_멀티턴_문항이_들어있다() -> None:
-    # supervisor 프롬프트가 약속하는 맥락 라우팅("두 번째 거 자세히" → deposit)은
+    # router 프롬프트가 약속하는 맥락 라우팅("두 번째 거 자세히" → deposit)은
     # 단일턴 문항만으로는 회귀를 잡을 수 없다
     with_history = [r for r in load_golden() if r.history]
     assert len(with_history) >= 4

@@ -11,8 +11,8 @@ from app.agents.graph import (
     history_for_llm,
     out_of_scope,
     route_by_intent,
+    router,
     run_worker,
-    supervisor,
 )
 from app.agents.prompts import OUT_OF_SCOPE_REPLY
 
@@ -33,10 +33,10 @@ def test_의도가_비어있으면_general로_보낸다() -> None:
     assert route_by_intent(make_state("")) == "general"
 
 
-def test_그래프에_supervisor와_워커_노드가_모두_있다() -> None:
+def test_그래프에_router와_워커_노드가_모두_있다() -> None:
     graph = build_graph()
     nodes = set(graph.get_graph().nodes)
-    assert {"supervisor", "deposit", "loan", "general", "out_of_scope"} <= nodes
+    assert {"router", "deposit", "loan", "general", "out_of_scope"} <= nodes
 
 
 class FakeStructuredModel:
@@ -55,19 +55,19 @@ class FakeChatModel:
         return FakeStructuredModel(self._intent)
 
 
-def test_supervisor는_분류_결과를_intent에_기록한다(monkeypatch: Any) -> None:
+def test_router는_분류_결과를_intent에_기록한다(monkeypatch: Any) -> None:
     import app.agents.graph as graph_module
 
     monkeypatch.setattr(graph_module, "_chat_model", lambda: FakeChatModel("deposit"))
-    update = supervisor(make_state())
+    update = router(make_state())
     assert update == {"intent": "deposit"}
 
 
-def test_supervisor는_범위_밖_의도도_기록한다(monkeypatch: Any) -> None:
+def test_router는_범위_밖_의도도_기록한다(monkeypatch: Any) -> None:
     import app.agents.graph as graph_module
 
     monkeypatch.setattr(graph_module, "_chat_model", lambda: FakeChatModel("out_of_scope"))
-    assert supervisor(make_state()) == {"intent": "out_of_scope"}
+    assert router(make_state()) == {"intent": "out_of_scope"}
 
 
 class ExplodingModel:
@@ -96,14 +96,14 @@ def test_분류_호출이_실패하면_general로_폴백한다(monkeypatch: Any)
     import app.agents.graph as graph_module
 
     monkeypatch.setattr(graph_module, "_chat_model", lambda: ExplodingModel())
-    assert supervisor(make_state()) == {"intent": "general"}
+    assert router(make_state()) == {"intent": "general"}
 
 
 def test_분류_결과가_형식에_맞지_않으면_general로_폴백한다(monkeypatch: Any) -> None:
     import app.agents.graph as graph_module
 
     monkeypatch.setattr(graph_module, "_chat_model", lambda: NoneModel())
-    assert supervisor(make_state()) == {"intent": "general"}
+    assert router(make_state()) == {"intent": "general"}
 
 
 def test_범위_밖_질문은_LLM을_태우지_않고_고정_문구로_거절한다(monkeypatch: Any) -> None:
@@ -134,7 +134,7 @@ def test_general_프롬프트는_조회_불가_상품의_추천을_막는다() -
 
 
 def test_챗_모델은_프로세스당_한_번만_만든다() -> None:
-    # 생성 시점에 sync·async httpx 클라이언트를 즉시 만들므로, supervisor처럼
+    # 생성 시점에 sync·async httpx 클라이언트를 즉시 만들므로, router처럼
     # 모든 요청이 지나는 경로에서 매번 새로 만들면 커넥션 풀이 그대로 버려진다
     import app.agents.graph as graph_module
 
